@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FlowWord 本地集成测试</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #edece6; color: #27382e; font: 14px "Segoe UI", "Microsoft YaHei", sans-serif; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 22px 38px; border-bottom: 1px solid #d9ded4; }
+    header strong { letter-spacing: 2px; font-size: 13px; }
+    header span { color: #83917b; font-size: 11px; }
+    main { max-width: 1020px; margin: 32px auto; padding: 0 24px; }
+    #movie_player { width: 100%; height: 450px; position: relative; background: #132c2a; border-radius: 16px; overflow: hidden; }
+    video { width: 100%; height: 100%; object-fit: cover; }
+    #scene { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+    .ytp-caption-window-container { position: absolute; bottom: 42px; width: 100%; text-align: center; pointer-events: none; }
+    .ytp-caption-segment { display: inline-block; background: #000a; color: #fff; padding: 7px 12px; border-radius: 5px; font-size: 18px; }
+    .controls { position: absolute; bottom: 12px; left: 18px; display: flex; gap: 10px; }
+    button { cursor: pointer; border: 1px solid #ffffff35; border-radius: 7px; padding: 6px 12px; color: #f3f5ea; background: #ffffff15; }
+    h1 { font-size: 22px; margin: 26px 0 10px; font-weight: 500; }
+    p { color: #788575; font-size: 12px; line-height: 1.8; }
+    #secondary { width: 1px; height: 1px; position: absolute; top: 0; left: 0; opacity: 0; }
+  </style>
+</head>
+<body>
+  <header><strong>FLOWWORD / TEST LAB</strong><span>本地测试页面 · 非真实 YouTube</span></header>
+  <main>
+    <div id="movie_player">
+      <video class="html5-main-video" src="/flowword-test-video.webm" muted playsinline loop></video>
+      <div class="ytp-caption-window-container"><span class="ytp-caption-segment">I came across a rather obscure reference.</span></div>
+      <div class="controls"><button id="play">播放 / 暂停</button><button id="fullscreen">全屏</button><button id="theater">影院布局</button></div>
+    </div>
+    <h1 class="ytd-watch-metadata">留住一句话，再继续向前。</h1>
+    <p>这是自动化测试使用的播放器与字幕夹具，字幕为预设测试数据<br />它验证生产扩展的真实加载与交互，不代表真实 YouTube 字幕兼容性已通过</p>
+    <video id="secondary" src="/flowword-test-video.webm" muted playsinline loop></video>
+  </main>
+  <script>
+    const video = document.querySelector('video.html5-main-video');
+    const canvas = document.createElement('canvas');
+    canvas.id = 'scene';
+    canvas.width = 1280;
+    canvas.height = 720;
+    const drawing = canvas.getContext('2d');
+    function draw() {
+      const gradient = drawing.createLinearGradient(0, 0, 1280, 720);
+      gradient.addColorStop(0, '#123335');
+      gradient.addColorStop(1, '#345c48');
+      drawing.fillStyle = gradient;
+      drawing.fillRect(0, 0, 1280, 720);
+      drawing.strokeStyle = '#c3d9a51f';
+      drawing.lineWidth = 1;
+      for (let line = 0; line < 8; line++) {
+        drawing.beginPath();
+        drawing.arc(1130, 160, 100 + line * 70, 0, Math.PI * 2);
+        drawing.stroke();
+      }
+      drawing.fillStyle = '#b2c9a1';
+      drawing.font = '13px Segoe UI';
+      drawing.fillText('LOCAL INTEGRATION TEST · SYNTHETIC VIDEO', 80, 210);
+      drawing.fillStyle = '#eef2df';
+      drawing.font = '54px Georgia';
+      drawing.fillText('A small pause.', 80, 300);
+      drawing.fillText('A little more clarity.', 80, 370);
+      drawing.fillStyle = '#a0b49a';
+      drawing.font = '14px Segoe UI';
+      drawing.fillText('FlowWord · browser extension test fixture', 82, 450);
+      requestAnimationFrame(draw);
+    }
+    draw();
+    video.after(canvas);
+    let liveStream = null;
+    window.testLive = async (value) => {
+      if (liveStream) liveStream.getTracks().forEach((track) => track.stop());
+      liveStream = value ? canvas.captureStream(20) : null;
+      video.srcObject = liveStream;
+      if (!value) video.load();
+      await video.play();
+    };
+    // 主场景播放自建有限 WebM 文件，直播场景才使用真实 MediaStream
+    // 字幕仍是明确标注的预设测试数据，不能替代真实 YouTube 验证
+    document.querySelector('#play').onclick = () => video.paused ? video.play() : video.pause();
+    document.querySelector('#fullscreen').onclick = () => document.querySelector('#movie_player').requestFullscreen();
+    document.querySelector('#theater').onclick = () => { document.querySelector('main').style.maxWidth = '100%'; };
+    window.testCaption = (text) => { document.querySelector('.ytp-caption-segment').textContent = text; };
+  </script>
+</body>
+</html>

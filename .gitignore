@@ -1,0 +1,8 @@
+node_modules/
+.wxt/
+.output/
+.cache/
+release/
+test-results/
+*.local
+*.log

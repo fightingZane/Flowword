@@ -1,0 +1,84 @@
+:host { all: initial; color-scheme: light dark; }
+.fw-app {
+  --fw-paper: #f8f9f5;
+  --fw-ink: #23352d;
+  --fw-muted: #748078;
+  --fw-line: #e1e7df;
+  --fw-green: #355f47;
+  --fw-wash: #eef2e9;
+  --fw-shadow: 0 18px 68px #0f211f30, 0 3px 12px #0f211f10;
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: var(--fw-ink);
+  text-align: left;
+  letter-spacing: normal;
+}
+.fw-app *, .fw-app *::before, .fw-app *::after { box-sizing: border-box; }
+.fw-app button, .fw-app select { font: inherit; color: inherit; }
+.fw-app button { cursor: pointer; border: 0; }
+.fw-app button:focus-visible, .fw-app select:focus-visible { outline: 3px solid #93b59b; outline-offset: 3px; }
+.fw-app button:disabled { opacity: .5; cursor: default; }
+.fw-ball {
+  position: fixed;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ffffff4d !important;
+  border-radius: 50%;
+  color: #dceacb !important;
+  background: #254334bf;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 4px 22px #0a151538, inset 0 1px 1px #ffffff20;
+  opacity: .74;
+  touch-action: none;
+  user-select: none;
+  transition: opacity .16s, background .16s, box-shadow .16s;
+}
+.fw-ball:hover, .fw-ball:focus-visible, .fw-ball.is-open { opacity: 1; background: #294c3ae8; }
+.fw-ball.is-dragging { opacity: 1; cursor: grabbing; transition: none; }
+.fw-ball-dot { position: absolute; width: 5px; height: 5px; background: #c5dca0; border-radius: 50%; right: 9px; top: 10px; }
+.fw-tooltip { position: absolute; right: 66px; white-space: nowrap; padding: 7px 12px; border-radius: 8px; font-size: 11px; font-weight: 400; background: #1c3229e8; color: #e7efdf; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.fw-ball:hover .fw-tooltip, .fw-ball:focus-visible .fw-tooltip { opacity: 1; }
+.fw-bubble { position: fixed; z-index: 2147483647; overflow-y: auto; border: 1px solid #ffffff80; border-radius: 20px; background: var(--fw-paper); box-shadow: var(--fw-shadow); }
+.fw-header { display: flex; justify-content: space-between; align-items: center; padding: 17px 19px 15px; border-bottom: 1px solid var(--fw-line); }
+.fw-brand { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; }
+.fw-mini-mark { display: flex; padding: 4px; border-radius: 7px; color: var(--fw-green); background: var(--fw-wash); }
+.fw-dot-separator { font-weight: 400; color: #bbc4b8; padding: 0 2px; }
+.fw-brand-caption { color: var(--fw-muted); font-size: 11px; font-weight: 400; }
+.fw-icon-button { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; background: transparent; color: var(--fw-muted) !important; }
+.fw-icon-button:hover { background: var(--fw-wash); }
+.fw-body { padding: 22px 23px 18px; }
+.fw-eyebrow { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--fw-muted); letter-spacing: .3px; }
+.fw-source-dot { width: 5px; height: 5px; background: #83967a; border-radius: 50%; }
+.fw-time { margin-left: auto; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+.fw-sentence { font-family: Georgia, "Times New Roman", serif; font-size: 23px; font-weight: 400; line-height: 1.45; margin: 14px 0 17px; overflow-wrap: anywhere; user-select: text; }
+.fw-context-note { font-size: 10px; color: var(--fw-muted); line-height: 1.8; }
+.fw-tools { display: flex; align-items: center; gap: 16px; padding: 15px 0 18px; border-bottom: 1px solid var(--fw-line); }
+.fw-tools button { display: flex; align-items: center; gap: 5px; background: transparent; padding: 0; color: var(--fw-green); font-size: 10px; }
+.fw-tools button:hover { color: var(--fw-ink); }
+.fw-copy { margin-left: auto; padding: 4px !important; }
+.fw-offset { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-top: 17px; color: var(--fw-muted); font-size: 10px; }
+.fw-offset select { border: 1px solid var(--fw-line); border-radius: 7px; padding: 5px 7px; background: var(--fw-paper); color: var(--fw-ink); font-size: 10px; cursor: pointer; }
+.fw-footer { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; padding: 14px 18px; background: var(--fw-wash); }
+.fw-footer > span { display: flex; align-items: center; gap: 5px; color: var(--fw-muted); font-size: 10px; }
+.fw-primary { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 15px; background: var(--fw-green); color: #f4f7ef !important; border-radius: 10px; font-size: 11px !important; font-weight: 500 !important; }
+.fw-primary:hover { filter: brightness(1.12); }
+.fw-loading { min-height: 155px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.fw-loading-symbol { color: var(--fw-green); }
+.fw-loading p { font-size: 14px; margin: 14px 0 3px; }
+.fw-loading > span { font-size: 10px; color: var(--fw-muted); }
+.fw-spinner { display: inline-block; width: 21px; height: 21px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: fw-spin .7s linear infinite; }
+.fw-error { padding: 5px 0 10px; }
+.fw-error-symbol { display: inline-block; padding: 8px 12px; font: 25px Georgia, serif; border-radius: 11px; color: #798967; background: var(--fw-wash); }
+.fw-error h2 { font-size: 15px; font-weight: 550; margin: 16px 0 8px; }
+.fw-error p { font-size: 12px; line-height: 1.9; color: var(--fw-muted); margin: 0 0 17px; }
+.fw-retry { display: flex; gap: 8px; align-items: center; padding: 0; background: transparent; color: var(--fw-green) !important; font-size: 11px !important; }
+.fw-inline-error p, .fw-notice { font-size: 11px; color: var(--fw-muted); margin: 11px 0 0; }
+@keyframes fw-spin { to { transform: rotate(360deg); } }
+@media (prefers-color-scheme: dark) {
+  .fw-app { --fw-paper: #202b25; --fw-ink: #e4ebdf; --fw-muted: #a2afa1; --fw-line: #37483c; --fw-green: #5a7c5d; --fw-wash: #28382d; --fw-shadow: 0 18px 68px #0006; }
+  .fw-bubble { border-color: #ffffff16; }
+  .fw-mini-mark { color: #c7dbb2; }
+  .fw-tools button, .fw-retry { color: #b8d1a8 !important; }
+}
+@media (prefers-reduced-motion: reduce) { .fw-app * { transition: none !important; animation-duration: 1.5s !important; } }
