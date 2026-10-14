@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import type { WordbookEntry } from '../../src/core/types';
 import { filterWordbook } from '../../src/core/wordbook-filters';
@@ -19,6 +19,8 @@ export function Wordbook() {
   const [filters, setFilters] = useState({ search: '', kind: '', part: '', exam: '', tag: '' });
   const [sort, setSort] = useState('recent');
   const [theme, setTheme] = useState('light');
+  // 此布局回调无参数，把当前theme同步到整页根节点，避免两侧与滚动背景仍用默认浅色
+  useLayoutEffect(() => { document.documentElement.dataset.bookTheme = theme; }, [theme]);
   const [archive, setArchive] = useState<ArchiveSnapshot>({ videos: [], captures: [], occurrences: [] });
   const [video, setVideo] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);

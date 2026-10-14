@@ -38,6 +38,13 @@ try {
   log('按视频筛选关联词条并切换视频时间排序');
   await page.getByLabel('单词本主题').selectOption('lavender'); await page.reload();
   await page.waitForFunction(() => document.querySelector('.book')?.dataset.theme === 'lavender');
+  await page.setViewportSize({ width: 2048, height: 1000 });
+  for (const theme of ['dark', 'mint', 'lavender']) {
+    await page.getByLabel('单词本主题').selectOption(theme);
+    const colors = await page.evaluate(() => [document.documentElement, document.body, document.getElementById('root'), document.querySelector('.book')].map((element) => getComputedStyle(element).backgroundColor));
+    assert.equal(new Set(colors).size, 1);
+    if (theme === 'dark') await page.screenshot({ path: 'test-results/wordbook-dark-wide.png' });
+  }
   log('单词本紫藤主题重载后持久化');
   const downloadEvent = page.waitForEvent('download'); await page.getByRole('button', { name: '导出单词本' }).click();
   const download = await downloadEvent; const path = await download.path(); const { readFile } = await import('node:fs/promises'); const backup = JSON.parse(await readFile(path, 'utf8'));

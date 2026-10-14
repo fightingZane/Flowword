@@ -35,3 +35,12 @@ describe('云端语境结果与密钥边界', () => {
     await expect(requestCloud({ ...DEFAULT_PROVIDER, mode: 'cloud', model: 'model', apiKey: 'secret-key' }, 'Hello', [], 'translate', fetcher)).rejects.toThrow('HTTP 401');
   });
 });
+
+it('仅官方DeepSeek域关闭思考并限制对应任务输出', async () => {
+  const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => envelope({ translation: '你好' }) });
+  await requestCloud({ ...DEFAULT_PROVIDER, mode: 'cloud', endpoint: 'https://api.deepseek.com/chat/completions', model: 'test', apiKey: 'synthetic' }, 'Hello', [], 'translate', fetcher);
+  expect(JSON.parse(fetcher.mock.calls[0]![1].body)).toMatchObject({ thinking: { type: 'disabled' }, max_tokens: 768 });
+  await requestCloud({ ...DEFAULT_PROVIDER, mode: 'cloud', endpoint: 'https://other.example/chat/completions', model: 'test', apiKey: 'synthetic' }, 'Hello', [], 'translate', fetcher);
+  expect(JSON.parse(fetcher.mock.calls[1]![1].body)).not.toHaveProperty('thinking');
+  expect(JSON.parse(fetcher.mock.calls[1]![1].body)).not.toHaveProperty('max_tokens');
+});

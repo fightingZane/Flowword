@@ -19,7 +19,7 @@ if (existing?.isSymbolicLink()) throw new Error('生成目录不能是符号链�
 await rm(output, { recursive: true, force: true });   // 已校验绝对路径，只重建项目内的生成目录
 await mkdir(output, { recursive: true });
 await cp(built, output, { recursive: true });
-for (const version of ['0.1.0', '0.2.0']) {
+for (const version of ['0.1.0', '0.2.0', '0.3.0']) {
   const previous = resolve(`release/FlowWord-${version}`);
   const previousInfo = await lstat(previous).catch(() => null);
   if (previousInfo) {
@@ -33,7 +33,7 @@ await cp('TEST_REPORT.md', 'release/验证报告.md');
 await cp(`.output/flowword-${metadata.version}-chrome.zip`, `release/FlowWord-${metadata.version}.zip`);
 const evidence = resolve(`release/verification-${metadata.version}`);
 await mkdir(evidence, { recursive: true });
-for (const file of ['e2e-report.json', 'features-report.json', 'upgrade-report.json', 'archive-report.json', 'sites-report.json', 'translation-live-report.json', 'floating-light.png', 'floating-dark.png', 'floating-narrow.png', 'floating-fullscreen.png', 'popup.png', 'configuration.png', 'upgrade-v03.png', 'wordbook-v03.png']) {
+for (const file of ['e2e-report.json', 'features-report.json', 'upgrade-report.json', 'archive-report.json', 'sites-report.json', 'translation-live-report.json', 'floating-light.png', 'floating-dark.png', 'floating-narrow.png', 'floating-fullscreen.png', 'popup.png', 'configuration.png', 'upgrade-v03.png', 'wordbook-v03.png', 'wordbook-dark-wide.png']) {
   await cp(resolve('test-results', file), resolve(evidence, file));   // 交付实测证据，不只留下成功结论
 }
 const hashes = [];

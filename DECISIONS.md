@@ -79,3 +79,8 @@ MAIN world 修改 video.duration 不会改变内容脚本 ISOLATED world 的原�
 通用站optional按origin申请并动态注册，顶层原生英文轨道；无头授权弹窗无法确认时使用只预授一个owned origin的受控副本测试，生产manifest不变。实际系统快捷键/权限同意撤销/真实模型待人工验收，不能把模拟协议当真服务证明。
 
 保留旧DB version1，新archive分库。历史occurrence义与原文不因最新收藏或改名覆盖，videoKey参与去重并导入保留end。溯源句首与重听采用同一观测范围。新增函数按更新AGENTS补名称、参数、用途和限制简介，注释不带句号。
+
+## D012：0.3.1非思考与双缓存
+DeepSeek官方思考默认enabled/high，官方来源https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/，仅api.deepseek.com显式disabled，不改变模型名、不把厂商参数强加其他服务。前台两路并行独立emit，整句和表达均JSON持久缓存，空表达列表有效，坏结果不缓存成功。
+旧预译范围保留，新prefetchExpressions默认false独立授权，仍20句预算，每新句最多额外解析调用。后台模式与权限出队复查。浏览器缓存命中48ms属于本地合成夹具测量，实际在线延迟仍待用户配置验收，不能承诺任意首句零等待。
+主题变量移根节点，避免CSS变量子到父不可继承；中文直接放英文正下方，动作与邻句排后。

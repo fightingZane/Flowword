@@ -1,10 +1,10 @@
-# FlowWord 0.3.0 安装、升级和配置
+# FlowWord 0.3.1 安装、升级和配置
 
 ## 原版升级
-原release/FlowWord-0.1.0和FlowWord-0.2.0目录内容已更新到0.3.0，名称保留维持加载路径。.output/chrome-mv3也已重建。
-先从旧词本导出备份，在chrome://extensions或edge://extensions点击FlowWord重新加载，确认版本0.3.0，再刷新视频。新增scripting权限可能需浏览器确认。不要卸载旧扩展或换加载路径。
+原release/FlowWord-0.1.0、FlowWord-0.2.0和FlowWord-0.3.0目录内容已更新到0.3.1，名称保留维持加载路径。.output/chrome-mv3也已重建。
+先从旧词本导出备份，在chrome://extensions或edge://extensions点击FlowWord重新加载，确认版本0.3.1，再刷新视频。不要卸载旧扩展或换加载路径，已有API配置仍保留。
 
-首次安装：开发者模式加载release/FlowWord-0.3.0；ZIP先解压，选择直接包含manifest.json的目录。工具栏FlowWord开启视频悬浮球。
+首次安装：开发者模式加载release/FlowWord-0.3.1；ZIP先解压，选择直接包含manifest.json的目录。工具栏FlowWord开启视频悬浮球。
 
 ## 云端语境翻译
 1. 浏览器工具栏FlowWord → 云端模型与快捷键设置
@@ -12,7 +12,9 @@
 3. 填提供方完整HTTPS请求地址、实际支持的模型、API Key
 4. 点击“授权接口并保存”，仅授权选定服务域名
 5. 返回视频重新点击球，检查整句译文和语境表达
-6. 需要缓存提速时开启预译，明确可能额外计费
+6. 需要点开即见准备好的结果时，开启播放预译及“提前准备词组释义”，保存后回视频播放；新词组预解析可能增加调用费用，默认不替旧用户开启
+
+DeepSeek用户接口填https://api.deepseek.com/chat/completions，模型填实际支持的deepseek-flash，Key保留自己的本地值。0.3.1针对官方域自动关闭思考模式；首次或未准备内容仍取决于真实网络和服务速度。
 
 Key只在独立扩展页填写，不要发聊天。没有实际配置时，真实云端效果尚未验证。MyMemory仍可作整句参考服务，不能提供模型语境解释。
 右键联网总开关会停止新的翻译和预译；清除密钥同时关闭联网。

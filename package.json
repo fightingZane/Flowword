@@ -2,7 +2,7 @@
   "name": "flowword",
   "description": "低干扰的 YouTube 英语字幕悬浮助手",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "scripts": {
     "dev": "wxt",

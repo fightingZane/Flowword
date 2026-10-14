@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { STORAGE } from '../src/storage/settings';
-import { effectiveProvider, learningRequest } from '../src/services/learning-background';
+import { effectiveProvider, learningRequest, prefetchLearning } from '../src/services/learning-background';
 import { allEntries, deleteEntry, saveEntry } from '../src/storage/wordbook';
 
 export default defineBackground(() => {
@@ -14,13 +14,13 @@ export default defineBackground(() => {
         const extensionPage = sender.url?.startsWith(browser.runtime.getURL('/')) === true;
         if (message.type === 'FLOWWORD_PROVIDER_CHANGED' && extensionPage) {
           const config = await effectiveProvider();
-          const publicConfig = { mode: config.mode, model: config.model, prefetch: config.prefetch, configured: config.mode !== 'cloud' || !!config.apiKey };
+          const publicConfig = { mode: config.mode, model: config.model, prefetch: config.prefetch, prefetchExpressions: config.prefetchExpressions === true, configured: config.mode !== 'cloud' || !!config.apiKey };
           for (const tab of await browser.tabs.query({})) if (tab.id !== undefined) void browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_PROVIDER_CHANGED', ...publicConfig }).catch(() => {});
           return { ok: true };
         }
         if (message.type === 'FLOWWORD_PROVIDER_PUBLIC') {
           const config = await effectiveProvider();
-          return { ok: true, mode: config.mode, model: config.model, prefetch: config.prefetch, configured: config.mode !== 'cloud' || !!config.apiKey };
+          return { ok: true, mode: config.mode, model: config.model, prefetch: config.prefetch, prefetchExpressions: config.prefetchExpressions === true, configured: config.mode !== 'cloud' || !!config.apiKey };
         }
         if (message.type === 'FLOWWORD_SETTINGS_OPEN') { await browser.tabs.create({ url: browser.runtime.getURL('/settings.html') }); return { ok: true }; }
         if (message.type === 'FLOWWORD_TRANSLATE' || message.type === 'FLOWWORD_CONTEXT') {
@@ -47,8 +47,9 @@ export default defineBackground(() => {
           });
           prefetchQueue = reservation.then(() => {}, () => {});
           const reserved = await reservation;
-          const results = await Promise.allSettled(reserved.map((item) => learningRequest(item.sentence, item.context, 'translate', 'prefetch')));
-          return { ok: true, results: results.map((result, index) => ({ text: reserved[index]?.sentence, ...(result.status === 'fulfilled' ? result.value as object : { error: '预译失败' }) })) };
+          const results: object[] = [];
+          for (const item of reserved) results.push(await prefetchLearning(item.sentence, item.context, config.prefetchExpressions === true));
+          return { ok: true, results };
         }
         if (message.type === 'FLOWWORD_ENABLE_SITE' && extensionPage) {
           const origin = new URL(message.origin).origin;

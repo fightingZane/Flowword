@@ -4,6 +4,7 @@ import { launchTestBrowser } from './test-browser.mjs';
 
 const run = await launchTestBrowser();
 const cases = []; const errors = [];
+let cacheDisplayMs;
 const fixture = await readFile('tests/fixtures/player.html', 'utf8');
 const media = await readFile('tests/fixtures/test-video.webm');
 const log = (name) => { cases.push(name); console.log('PASS ' + name); };
@@ -48,6 +49,7 @@ try {
   await page.locator('flowword-ui .fw-translation').filter({ hasText: '冷门' }).waitFor();
   assert.equal(await page.locator('flowword-ui .fw-context-expression').count(), 0);
   await page.locator('flowword-ui .fw-context-expression').waitFor(); assert.match(await panel.innerText(), /而不是走过某处/);
+  assert.equal(await page.locator('flowword-ui .fw-sentence').evaluate((element) => element.nextElementSibling?.className), 'fw-current-translation');
   log('模拟云模型整句先展示，慢语境表达随后显示，表达定位到原句');
   const publicConfig = await settings.evaluate(() => chrome.runtime.sendMessage({ type: 'FLOWWORD_PROVIDER_PUBLIC' }));
   assert.ok(!JSON.stringify(publicConfig).includes('DUMMY')); assert.ok(!('apiKey' in publicConfig));
@@ -55,11 +57,13 @@ try {
   assert.equal(await page.locator('input[type=password]').count(), 0);
   log('密钥不进入网页、storage.local或公开设置消息');
   const before = await run.worker.evaluate(() => globalThis.cloudRequests.length);
-  await page.getByRole('button', { name: '继续播放并关闭翻译框' }).click(); await ball.waitFor(); await ball.click();
+  await page.getByRole('button', { name: '继续播放并关闭翻译框' }).click(); await ball.waitFor(); const cacheStart = performance.now(); await ball.click();
   await page.locator('flowword-ui .fw-translation').waitFor();
-  const calls = await run.worker.evaluate(() => globalThis.cloudRequests.length); assert.ok(calls <= before + 1);
-  log('相同整句命中持久缓存，不重复整句请求');
+  await page.locator('flowword-ui .fw-context-expression').waitFor();
+  cacheDisplayMs = Math.round(performance.now() - cacheStart);
+  const calls = await run.worker.evaluate(() => globalThis.cloudRequests.length); assert.equal(calls, before);
+  log('相同整句和词组均命中持久缓存，点击不产生新模型请求');
   await page.screenshot({ path: 'test-results/upgrade-v03.png' });
   assert.deepEqual(errors, []);
 } catch (error) { errors.push(error.stack); console.error(error); process.exitCode = 1; if (page) await page.screenshot({ path: 'test-results/upgrade-failure.png' }).catch(() => {}); }
-finally { await mkdir('test-results', { recursive: true }); await writeFile('test-results/upgrade-report.json', JSON.stringify({ environment: 'Production MV3, synthetic subtitles and MOCK cloud API', cases, errors, passed: !errors.length }, null, 2)); await run.context.close(); }
+finally { await mkdir('test-results', { recursive: true }); await writeFile('test-results/upgrade-report.json', JSON.stringify({ environment: 'Production MV3, synthetic subtitles and MOCK cloud API', cacheDisplayMs, cases, errors, passed: !errors.length }, null, 2)); await run.context.close(); }

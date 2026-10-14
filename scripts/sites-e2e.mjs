@@ -201,6 +201,8 @@ try {
 
   await run.worker.evaluate(() => {
     globalThis.fixtureCloudRequests = [];
+    globalThis.fixturePrefetchMessages = [];
+    chrome.runtime.onMessage.addListener((message) => { if (message.type === 'FLOWWORD_PREFETCH') globalThis.fixturePrefetchMessages.push(message.items); });
     globalThis.fetch = async (_url, options) => {
       const data = JSON.parse(options.body); const input = JSON.parse(data.messages[1].content);
       const details = data.messages[0].content.includes('Explain up to');
@@ -215,7 +217,9 @@ try {
   await seek(3, true); await page.waitForTimeout(2300);
   assert.equal(await run.worker.evaluate(() => globalThis.fixtureCloudRequests.length), 0);
   log('云端已配置但预译未启用时，播放字幕零网络请求');
-  await extension.getByRole('checkbox').check(); await extension.getByRole('button', { name: '授权接口并保存' }).click();
+  await extension.getByRole('checkbox', { name: /允许播放中预译/ }).check(); await extension.getByRole('button', { name: '授权接口并保存' }).click();
+  await extension.getByText('配置已保存', { exact: false }).waitFor();
+  await page.bringToFront();   // 模拟用户从配置页回到视频，避免后台标签定时器节流错过短字幕
   await seek(3, true);
   await until(() => run.worker.evaluate(() => globalThis.fixtureCloudRequests.some((item) => item.input.current === 'The current sentence explains an obscure reference.')));
   const predicted = await run.worker.evaluate(() => globalThis.fixtureCloudRequests.filter((item) => item.task === 'translate'));
@@ -259,6 +263,7 @@ try {
   log(pregrantedFixture ? '可信撤销通知停止当前脚本，删除动态注册后重载不再注入（原生权限撤销待验）' : '真实权限撤销停止当前脚本，动态注册清除，重载不再注入');
   assert.deepEqual(report.errors, []);
 } catch (error) {
+  report.debug = await run.worker.evaluate(async () => ({ requests: globalThis.fixtureCloudRequests, prefetchMessages: globalThis.fixturePrefetchMessages, session: await chrome.storage.session.get(null) })).catch(() => ({}));
   report.errors.push(error.stack || String(error)); console.error(error); process.exitCode = 1;
   if (page) await page.screenshot({ path: 'test-results/sites-failure.png' }).catch(() => {});
 } finally {

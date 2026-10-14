@@ -1,4 +1,4 @@
-body { margin: 0; background: #f1f4ed; color: #23352d; font: 16px/1.7 "Segoe UI", "Microsoft YaHei", sans-serif; }
+body { margin: 0; background: var(--book-bg, #f1f4ed); color: var(--book-text, #23352d); font: 16px/1.7 "Segoe UI", "Microsoft YaHei", sans-serif; }
 .book { max-width: 1200px; margin: auto; padding: 36px; }
 .book-header, .book-header > div { display: flex; align-items: center; justify-content: space-between; gap: 13px; }
 .book-header span { font-size: 25px; font-weight: 650; }
@@ -23,14 +23,16 @@ body { margin: 0; background: #f1f4ed; color: #23352d; font: 16px/1.7 "Segoe UI"
 .book-empty { padding: 60px 30px; background: #fff; border-radius: 16px; text-align: center; color: #72806a; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #91af83; outline-offset: 2px; }
 body:has(.book) { background: var(--book-bg, #f1f4ed); }
-.book { --book-bg: #f1f4ed; --book-card: #fff; --book-text: #23352d; --book-muted: #60705d; --book-border: #d9e2d2; --book-accent: #355f47; min-height: 100vh; box-sizing: border-box; color: var(--book-text); background: var(--book-bg); transition: background .2s, color .2s; }
-.book[data-theme="dark"] { --book-bg: #171f22; --book-card: #243138; --book-text: #e4eee6; --book-muted: #b6c6bf; --book-border: #45585a; --book-accent: #a3d7ba; }
-.book[data-theme="warm"] { --book-bg: #f6eee1; --book-card: #fffaf0; --book-text: #51372a; --book-muted: #84604c; --book-border: #dec8b2; --book-accent: #8c5435; }
-.book[data-theme="blue"] { --book-bg: #e8f0f7; --book-card: #f8fcff; --book-text: #183e5b; --book-muted: #526f85; --book-border: #bdd2e2; --book-accent: #286d9a; }
-.book[data-theme="lavender"] { --book-bg: #eee9f7; --book-card: #fbf8ff; --book-text: #45365f; --book-muted: #79688e; --book-border: #d5c8e6; --book-accent: #745493; }
-.book[data-theme="rose"] { --book-bg: #f8e9ef; --book-card: #fff8fb; --book-text: #643747; --book-muted: #946979; --book-border: #e7c5d2; --book-accent: #a05272; }
-.book[data-theme="sunset"] { --book-bg: #fff0e4; --book-card: #fffaf4; --book-text: #603c2a; --book-muted: #946b4e; --book-border: #edc9ab; --book-accent: #bd6638; }
-.book[data-theme="mint"] { --book-bg: #e3f3ef; --book-card: #f7fffc; --book-text: #204e49; --book-muted: #587e77; --book-border: #b8ddd2; --book-accent: #328273; }
+:root { --book-bg: #f1f4ed; --book-card: #fff; --book-text: #23352d; --book-muted: #60705d; --book-border: #d9e2d2; --book-accent: #355f47; background: var(--book-bg); }
+html, body, #root { min-height: 100%; background: var(--book-bg); }
+.book { min-height: 100vh; box-sizing: border-box; color: var(--book-text); background: var(--book-bg); }
+:root[data-book-theme="dark"] { --book-bg: #171f22; --book-card: #243138; --book-text: #e4eee6; --book-muted: #b6c6bf; --book-border: #45585a; --book-accent: #a3d7ba; }
+:root[data-book-theme="warm"] { --book-bg: #f6eee1; --book-card: #fffaf0; --book-text: #51372a; --book-muted: #84604c; --book-border: #dec8b2; --book-accent: #8c5435; }
+:root[data-book-theme="blue"] { --book-bg: #e8f0f7; --book-card: #f8fcff; --book-text: #183e5b; --book-muted: #526f85; --book-border: #bdd2e2; --book-accent: #286d9a; }
+:root[data-book-theme="lavender"] { --book-bg: #eee9f7; --book-card: #fbf8ff; --book-text: #45365f; --book-muted: #79688e; --book-border: #d5c8e6; --book-accent: #745493; }
+:root[data-book-theme="rose"] { --book-bg: #f8e9ef; --book-card: #fff8fb; --book-text: #643747; --book-muted: #946979; --book-border: #e7c5d2; --book-accent: #a05272; }
+:root[data-book-theme="sunset"] { --book-bg: #fff0e4; --book-card: #fffaf4; --book-text: #603c2a; --book-muted: #946b4e; --book-border: #edc9ab; --book-accent: #bd6638; }
+:root[data-book-theme="mint"] { --book-bg: #e3f3ef; --book-card: #f7fffc; --book-text: #204e49; --book-muted: #587e77; --book-border: #b8ddd2; --book-accent: #328273; }
 .book-card, .book-editor, .book-empty { background: var(--book-card); border-color: var(--book-border); }
 .book-subtitle, .book-count, .book-header small, .book-card-meta, .book-card details, .book-empty { color: var(--book-muted); }
 .book-filters input, .book-filters select, .book-actions select, .book-actions button { color: var(--book-text); background: var(--book-card); border: 1px solid var(--book-border); border-radius: 9px; padding: 10px; font: inherit; }

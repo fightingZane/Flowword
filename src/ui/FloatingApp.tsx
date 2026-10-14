@@ -271,6 +271,13 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
         {!busy && state.context && <>
           <div className="fw-eyebrow"><span className="fw-source-dot" />{state.context.isPartial ? '字幕片段' : '字幕原文'}<span className="fw-time">{clock(state.context.targetTime)}</span></div>
           <p className="fw-sentence" lang="en">{state.context.text}</p>
+          {state.context.learning && <div className="fw-current-translation">
+            {state.context.learning.translation ? <p className="fw-translation">{state.context.learning.translation}</p>
+              : state.context.learning.status === 'loading' ? <p className="fw-learning-note">正在准备这一句译文…</p>
+              : state.context.learning.status === 'disabled' ? <p className="fw-learning-note">联网翻译尚未开启 <button type="button" onClick={() => setSettingsOpen(true)}>右键配置 / 开启翻译</button></p>
+              : <p className="fw-learning-note" role="status">{state.context.learning.error || '暂没有可用译文'}</p>}
+            <div className="fw-translation-label">当前句译文 <span>{state.context.learning.provider || '参考翻译'}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
+          </div>}
           <div className="fw-current-actions">
             <button type="button" className="fw-primary" onClick={() => add(state.context!.text, 'sentence', state.context!.learning?.translation || '', state.context!.text, '句子')}>收藏整句</button>
             {onRepeat && <button type="button" className="fw-retry" onClick={() => void onRepeat().catch((error) => flash(error instanceof Error ? error.message : '无法重听'))}>重听这一句 ↻</button>}
@@ -278,18 +285,13 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
           </div>
           {state.context.learning && <div className="fw-learning" key={`${state.context.selected.start}:${state.context.text}`}>
             {state.context.learning.timeline?.filter((line) => line.end <= state.context!.selected.start).slice(-1).map((line) => <div className="fw-neighbor" key={line.start}><p>{line.text}</p><p>{line.translation || '上下文译文尚未准备'}</p></div>)}
-            <div className="fw-translation-label">当前句译文 <span>{state.context.learning.provider || '参考翻译'}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
-            {state.context.learning.translation ? <p className="fw-translation">{state.context.learning.translation}</p>
-              : state.context.learning.status === 'loading' ? <p className="fw-learning-note">正在翻译，字幕已为你保留…</p>
-              : state.context.learning.status === 'disabled' ? <p className="fw-learning-note">联网翻译尚未开启 <button type="button" onClick={() => setSettingsOpen(true)}>右键配置 / 开启翻译</button></p>
-              : <p className="fw-learning-note" role="status">{state.context.learning.error || '暂没有可用译文'}</p>}
             {state.context.learning.timeline?.filter((line) => line.start >= state.context!.selected.end).slice(0, 1).map((line) => <div className="fw-neighbor" key={line.start}><p>{line.text}</p><p>{line.translation || '上下文译文尚未准备'}</p></div>)}
             <div className="fw-learning-title">优先看这些表达 <span>专业词 · 地道搭配 · 非概率</span></div>
             {state.context.learning.expressions?.map((expression) => <div className="fw-candidate fw-context-expression" key={expression.text}>
               <div className="fw-candidate-title"><strong>{expression.text}</strong><span className="fw-kind">{expression.partOfSpeech}</span><button type="button" onClick={() => add(expression.text, expression.kind, expression.meaning, expression.text, expression.partOfSpeech)}>加入</button></div>
               <p>{expression.meaning}</p><span className="fw-candidate-reason">{expression.reason}</span>
             </div>)}
-            {state.context.learning.contextStatus === 'loading' && <p className="fw-learning-note">整句已优先呈现，语境表达解析中…</p>}
+            {state.context.learning.contextStatus === 'loading' && <p className="fw-learning-note">语境表达解析中…</p>}
             {state.context.learning.contextError && <p className="fw-learning-note">{state.context.learning.contextError}</p>}
             {state.context.learning.provider === 'cloud' && <p className="fw-context-note">根据当前句与邻近字幕解释，模型结果仍需结合原文核对</p>}
             {state.context.learning.provider !== 'cloud' && !state.context.learning.expressions?.length && <>
