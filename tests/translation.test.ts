@@ -6,6 +6,9 @@ describe('真实翻译适配器的协议边界', () => {
   it('额度耗尽不能假装有译文', () => expect(() => translationText({ responseStatus: 200, quotaFinished: true, responseData: { translatedText: 'LIMIT REACHED' } }, 'English')).toThrow());
   it('HTTP层成功但服务报错也不能显示错误字符串为译文', () => expect(() => translationText({ responseStatus: 429, responseData: { translatedText: 'RATE LIMIT' } }, 'English')).toThrow());
   it('服务回显英文原句视为没有中文译文', () => expect(() => translationText({ responseStatus: 200, responseData: { translatedText: 'Hello' } }, 'hello')).toThrow());
+  it('数字垃圾与HTML不是中文释义', () => {
+    for (const translatedText of ['838,222', '<b>中文</b>', 'unrelated English']) expect(() => translationText({ responseStatus: 200, responseData: { translatedText } }, 'standard')).toThrow();
+  });
   it('UTF-8按字节限制，不能用字符长度冒充字节长度', () => {
     expect(validTranslationInput('a'.repeat(480))).toBe(true);
     expect(validTranslationInput('中'.repeat(161))).toBe(false);

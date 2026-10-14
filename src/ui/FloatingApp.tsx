@@ -7,6 +7,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { SaveEntryForm } from './SaveEntryForm';
 import { FlowMark, Icon } from './Icons';
 import { getCuratedMeaning, GENERAL_MEANING_NOTE } from '../core/curated-meanings';
+import { observedSentenceRange } from '../adapters/html5-subtitles';
 
 interface Props {
   controller: InteractionController;
@@ -15,15 +16,22 @@ interface Props {
   onOffset(offset: number): Promise<void>;
   onAppearance(appearance: Partial<Appearance>): Promise<void>;
   onOnlineTranslation(value: boolean): Promise<void>;
+  onRepeat?(): Promise<void>;
+  onFollow?(): Promise<void>;
 }
 
+// viewport 读取当前可见窗口尺寸，无参数，供球和面板边界计算使用
 const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
+// clock 将seconds视频时间格式化为分秒，负值按零处理，不改变视频进度
 const clock = (seconds: number) => {
   const value = Math.max(0, Math.floor(seconds));
   return `${Math.floor(value / 60).toString().padStart(2, '0')}:${(value % 60).toString().padStart(2, '0')}`;
 };
 
-export function FloatingApp({ controller, settings, onPosition, onOffset, onAppearance, onOnlineTranslation }: Props) {
+// FloatingApp 渲染球与学习面板，controller提供当前状态，settings提供已保存配置
+// onPosition和onOffset保存位置与偏移，onAppearance和onOnlineTranslation保存外观与联网开关
+// onRepeat和onFollow是可选播放动作，仅在已授权内容脚本挂载，不接收或显示API密钥
+export function FloatingApp({ controller, settings, onPosition, onOffset, onAppearance, onOnlineTranslation, onRepeat, onFollow }: Props) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const [screen, setScreen] = useState(viewport);
   const [point, setPoint] = useState(() => restorePosition(settings.position, viewport()));
@@ -31,6 +39,11 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   const [notice, setNotice] = useState('');
   const [copied, setCopied] = useState(false);
   const [panelHeight, setPanelHeight] = useState(360);
+  const [size, setSize] = useState({ width: settings.appearance.panelWidth, height: settings.appearance.panelHeight ?? 620 });
+  const liveSize = useRef(size);
+  liveSize.current = size;
+  const [manualPoint, setManualPoint] = useState<Point | null>(null);
+  const panelGesture = useRef<{ id: number; x: number; y: number; width: number; height: number; point: Point; resize: boolean } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<WordbookEntry | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -46,8 +59,11 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visible = settingsOpen || state.phase !== 'IDLE';
   const busy = ['CAPTURING', 'ANALYZING', 'RESUME'].includes(state.phase);
-  const panelWidth = Math.min(settings.appearance.panelWidth, Math.max(180, screen.width - 24));
-  const panelPoint = bubblePosition(point, screen, panelWidth, panelHeight);
+  const panelWidth = Math.min(size.width, Math.max(180, screen.width - 24));
+  const displayHeight = Math.min(size.height, Math.max(120, screen.height - 24));
+  const boundPanel = (value: Point) => ({ x: Math.max(12, Math.min(value.x, screen.width - panelWidth - 12)), y: Math.max(12, Math.min(value.y, screen.height - displayHeight - 12)) });
+  const panelPoint = manualPoint ? boundPanel(manualPoint) : bubblePosition(point, screen, panelWidth, displayHeight);
+  useEffect(() => setSize({ width: settings.appearance.panelWidth, height: settings.appearance.panelHeight ?? 620 }), [settings.appearance.panelWidth, settings.appearance.panelHeight]);
 
   useEffect(() => {
     setPoint(restorePosition(settings.position, viewport()));
@@ -82,12 +98,15 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
     if (visible) panel.current?.querySelector<HTMLButtonElement>('[data-close]')?.focus({ preventScroll: true });
   }, [visible]);
 
+  // flash 临时显示message操作反馈，供保存失败和成功提示使用，不改变播放状态
   function flash(message: string) {
     setNotice(message);
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     noticeTimer.current = setTimeout(() => { setNotice(''); setCopied(false); }, 2200);
   }
 
+  // finishDrag 结束球拖动，event提供指针身份，cancelled表示浏览器取消操作
+  // 只处理本次指针并保存贴边位置，拖动结束不能误触发暂停点击
   function finishDrag(event: React.PointerEvent<HTMLButtonElement>, cancelled = false) {
     const active = drag.current;
     if (!active || active.id !== event.pointerId) return;
@@ -102,6 +121,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
+  // close 收起配置或分析面板，无参数，由叉号和Escape调用，不自动恢复视频
   function close() {
     if (settingsOpen) { setSettingsOpen(false); return; }
     setDraft(null);
@@ -109,27 +129,36 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
     button.current?.focus({ preventScroll: true });
   }
 
+  // add 创建收藏草稿，text和kind描述原文与类型，translation是本次语境义
+  // lemma用于去重，partOfSpeech是可编辑词性，保存前保留真实句首和来源
   function add(text: string, kind: WordbookEntry['kind'], translation: string, lemma = text, partOfSpeech = '未分类') {
     const context = state.context;
     if (!context) return;
+    const range = observedSentenceRange(context);   // 与重听一致，拼接句从实际参与片段的句首溯源
     setDraft({ id: '', kind, text, lemma, translation, partOfSpeech, examTags: [], tags: [], createdAt: 0, updatedAt: 0,
-      contexts: [{ sentence: context.text, url: context.url, time: context.targetTime }] });
+      contexts: [{ sentence: context.text, url: context.url, time: range.start, end: range.end,
+        title: context.title, videoKey: context.videoKey, translation: context.learning?.translation }] });
   }
 
+  // save 将entry草稿交给扩展后台校验保存，成功后关闭表单，失败交回表单提示
   async function save(entry: WordbookEntry) {
     const response = await browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_SAVE', entry });
     if (!response?.ok) throw new Error(response?.error || '保存失败');
     setDraft(null); flash('已加入本地单词本');
   }
 
+  // lookup 查询lemma在当前原句中的语境义，需云端模型，不把独立词典义冒充语境义
+  // 换句后忽略旧回复，并回收查询按钮状态
   async function lookup(lemma: string) {
     const key = contextKey;
     setLookingUp(lemma);
     try {
-      const response = await browser.runtime.sendMessage({ type: 'FLOWWORD_TRANSLATE', sentence: lemma, words: [] });
+      const response = await browser.runtime.sendMessage({ type: 'FLOWWORD_CONTEXT', sentence: state.context?.text, context: [], focus: lemma });
       if (currentContext.current !== key) return;
-      if (!response?.translation) throw new Error(response?.error || '暂没有可用参考译文');
-      setExtraMeanings((previous) => ({ ...previous, [lemma]: response.translation }));
+      if (response?.contextUnavailable) throw new Error('语境释义需要在独立设置页配置云端模型');
+      const expression = response?.expressions?.find((item: { text: string }) => item.text.toLowerCase() === lemma.toLowerCase());
+      if (!expression?.meaning) throw new Error(response?.error || '当前模型未返回该词的语境义');
+      setExtraMeanings((previous) => ({ ...previous, [lemma]: expression.meaning }));
     } catch (error) { if (currentContext.current === key) flash(error instanceof Error ? error.message : '查询失败'); }
     finally { if (currentContext.current === key) setLookingUp(''); }
   }
@@ -137,6 +166,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   const appearanceStyle = { '--fw-font': `${settings.appearance.fontSize}px`, '--fw-ball-color': settings.appearance.ballColor,
     '--fw-ball-opacity': settings.appearance.ballOpacity / 100 } as React.CSSProperties;
 
+  // copy 复制当前原句，无参数，只在用户点击后写剪贴板，失败保留可选原文
   async function copy() {
     if (!state.context) return;
     try {
@@ -148,6 +178,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
     }
   }
 
+  // offset 保存value秒偏移后重新捕获，只选已读取字幕，不移动视频时间轴
   async function offset(value: number) {
     try {
       await onOffset(value);
@@ -206,14 +237,21 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
       className="fw-bubble"
       role="dialog"
       aria-label={settingsOpen ? 'FlowWord 配置框' : 'FlowWord 字幕面板'}
-      style={{ left: panelPoint.x, top: panelPoint.y, width: panelWidth, maxHeight: Math.max(120, screen.height - 24) }}
+      style={{ left: panelPoint.x, top: panelPoint.y, width: panelWidth, height: displayHeight, maxHeight: Math.max(120, screen.height - 24) }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') { event.preventDefault(); close(); }
         event.stopPropagation();   // 面板按键不触发 YouTube 的空格播放和方向键跳转
       }}
       onKeyUp={(event) => event.stopPropagation()}
     >
-      <header className="fw-header">
+      <header className="fw-header" onPointerDown={(event) => {
+        if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return;
+        panelGesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, ...size, point: panelPoint, resize: false };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }} onPointerMove={(event) => {
+        const gesture = panelGesture.current;
+        if (gesture?.id === event.pointerId && !gesture.resize) setManualPoint(boundPanel({ x: gesture.point.x + event.clientX - gesture.x, y: gesture.point.y + event.clientY - gesture.y }));
+      }} onPointerUp={() => { panelGesture.current = null; }} onPointerCancel={() => { panelGesture.current = null; }}>
         <div className="fw-brand"><span className="fw-mini-mark"><FlowMark size={17} /></span><span>FlowWord</span><span className="fw-dot-separator">/</span><span className="fw-brand-caption">{settingsOpen ? '配置' : '这一句'}</span></div>
         {!settingsOpen && <button type="button" className="fw-header-config" onClick={() => setSettingsOpen(true)}>配置</button>}
         <button type="button" data-close className="fw-icon-button" aria-label="关闭面板，保持视频暂停" title="关闭面板 · 保持暂停" onClick={close}><Icon name="close" size={16} /></button>
@@ -233,13 +271,28 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
         {!busy && state.context && <>
           <div className="fw-eyebrow"><span className="fw-source-dot" />{state.context.isPartial ? '字幕片段' : '字幕原文'}<span className="fw-time">{clock(state.context.targetTime)}</span></div>
           <p className="fw-sentence" lang="en">{state.context.text}</p>
-          {state.context.learning && <div className="fw-learning">
-            <div className="fw-translation-label">中文参考译文 <span>MyMemory{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
+          <div className="fw-current-actions">
+            <button type="button" className="fw-primary" onClick={() => add(state.context!.text, 'sentence', state.context!.learning?.translation || '', state.context!.text, '句子')}>收藏整句</button>
+            {onRepeat && <button type="button" className="fw-retry" onClick={() => void onRepeat().catch((error) => flash(error instanceof Error ? error.message : '无法重听'))}>重听这一句 ↻</button>}
+            {onFollow && <button type="button" className="fw-retry" onClick={() => void onFollow().catch((error) => flash(error instanceof Error ? error.message : '无法跟随'))}>字幕跟随 ▷</button>}
+          </div>
+          {state.context.learning && <div className="fw-learning" key={`${state.context.selected.start}:${state.context.text}`}>
+            {state.context.learning.timeline?.filter((line) => line.end <= state.context!.selected.start).slice(-1).map((line) => <div className="fw-neighbor" key={line.start}><p>{line.text}</p><p>{line.translation || '上下文译文尚未准备'}</p></div>)}
+            <div className="fw-translation-label">当前句译文 <span>{state.context.learning.provider || '参考翻译'}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
             {state.context.learning.translation ? <p className="fw-translation">{state.context.learning.translation}</p>
               : state.context.learning.status === 'loading' ? <p className="fw-learning-note">正在翻译，字幕已为你保留…</p>
               : state.context.learning.status === 'disabled' ? <p className="fw-learning-note">联网翻译尚未开启 <button type="button" onClick={() => setSettingsOpen(true)}>右键配置 / 开启翻译</button></p>
               : <p className="fw-learning-note" role="status">{state.context.learning.error || '暂没有可用译文'}</p>}
-            <div className="fw-learning-title">优先看这些表达 <span>难度参考 · 非概率</span></div>
+            {state.context.learning.timeline?.filter((line) => line.start >= state.context!.selected.end).slice(0, 1).map((line) => <div className="fw-neighbor" key={line.start}><p>{line.text}</p><p>{line.translation || '上下文译文尚未准备'}</p></div>)}
+            <div className="fw-learning-title">优先看这些表达 <span>专业词 · 地道搭配 · 非概率</span></div>
+            {state.context.learning.expressions?.map((expression) => <div className="fw-candidate fw-context-expression" key={expression.text}>
+              <div className="fw-candidate-title"><strong>{expression.text}</strong><span className="fw-kind">{expression.partOfSpeech}</span><button type="button" onClick={() => add(expression.text, expression.kind, expression.meaning, expression.text, expression.partOfSpeech)}>加入</button></div>
+              <p>{expression.meaning}</p><span className="fw-candidate-reason">{expression.reason}</span>
+            </div>)}
+            {state.context.learning.contextStatus === 'loading' && <p className="fw-learning-note">整句已优先呈现，语境表达解析中…</p>}
+            {state.context.learning.contextError && <p className="fw-learning-note">{state.context.learning.contextError}</p>}
+            {state.context.learning.provider === 'cloud' && <p className="fw-context-note">根据当前句与邻近字幕解释，模型结果仍需结合原文核对</p>}
+            {state.context.learning.provider !== 'cloud' && !state.context.learning.expressions?.length && <>
             <p className="fw-context-note">{GENERAL_MEANING_NOTE}</p>
             {state.context.learning.candidates.length ? state.context.learning.candidates.slice(0, expanded ? 8 : 3).map((candidate, index) => {
               const meaning = extraMeanings[candidate.lemma] || candidate.translation || candidate.meaning;
@@ -255,11 +308,11 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
               </div>;
             }) : <p className="fw-learning-note">这段字幕没有筛选出需要优先提示的表达</p>}
             {state.context.learning.candidates.length > 3 && <button type="button" className="fw-retry" onClick={() => setExpanded(!expanded)}>{expanded ? '收起更多' : '展开更多表达'}</button>}
+            </>}
             {state.context.learning.translation && state.context.learning.error && <p className="fw-learning-note">{state.context.learning.error}</p>}
           </div>}
           <div className="fw-context-note">{state.context.selected.language === 'und' ? '已捕获页面字幕 · 请确认播放器选择了 English' : '来自视频的英文字幕轨道'}</div>
           <div className="fw-tools">
-            <button type="button" onClick={() => add(state.context!.text, 'sentence', state.context!.learning?.translation || '', state.context!.text, '句子')}>加入整句</button>
             <button type="button" onClick={() => void controller.previous()}><Icon name="back" size={15} />上一条字幕</button>
             <button type="button" onClick={() => void controller.capture(settings.offset)}>回到点击时刻</button>
             <button type="button" className="fw-copy" onClick={() => void copy()} aria-label="复制原文"><Icon name={copied ? 'check' : 'copy'} size={15} /></button>
@@ -281,6 +334,16 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
         {notice && <p className="fw-notice" role="status">{notice}</p>}
         </>}
       </div>
+      <button type="button" className="fw-resize" aria-label="拖动调整翻译框大小" title="拖动调整宽高" onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        panelGesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, width: panelWidth, height: displayHeight, point: panelPoint, resize: true };
+        setManualPoint(panelPoint); event.currentTarget.setPointerCapture(event.pointerId);
+      }} onPointerMove={(event) => {
+        const gesture = panelGesture.current;
+        if (!gesture?.resize || gesture.id !== event.pointerId) return;
+        const next = { width: Math.min(screen.width - gesture.point.x - 12, Math.max(300, gesture.width + event.clientX - gesture.x)), height: Math.min(screen.height - gesture.point.y - 12, Math.max(280, gesture.height + event.clientY - gesture.y)) };
+        liveSize.current = next; setSize(next);   // 同一帧内抬起鼠标时仍保存最后位置，而不是旧render尺寸
+      }} onPointerUp={() => { if (panelGesture.current?.resize) void onAppearance({ panelWidth: liveSize.current.width, panelHeight: liveSize.current.height }).catch(() => flash('尺寸保存失败')); panelGesture.current = null; }} onPointerCancel={() => { panelGesture.current = null; }}>◢</button>
 
       {!draft && <footer className="fw-footer">
         {settingsOpen ? <><button type="button" className="fw-retry" onClick={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })}>打开单词本</button><button type="button" className="fw-primary" onClick={() => setSettingsOpen(false)}>配置完成</button></> : <>

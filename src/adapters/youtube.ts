@@ -120,7 +120,8 @@ export class YouTubeSubtitleAdapter implements SubtitlePort {
     this.sample();   // 点击时额外采样，降低定时采样落在字幕边界的误差
     const video = this.videos.current();
     if (!video || handle.key !== videoKey()) throw new Error('视频已经切换，请重新捕获');
-    const targetTime = Math.max(0, handle.time + offset);
+    const capturedTime = video.currentTime;
+    const targetTime = Math.max(0, capturedTime + offset);   // 以实际暂停后的时间命中当前采样，避免微小时间差回退到旧字幕
     const cues = cueSegments(englishTrack(video));
     const selected = cues.findLast((segment) => segment.start <= targetTime && segment.end >= targetTime)
       ?? this.cache.select(targetTime);
@@ -129,7 +130,7 @@ export class YouTubeSubtitleAdapter implements SubtitlePort {
         ? '这个时间附近没有缓存字幕，请调回 0 秒或继续播放后再试'
         : '没有读到英文字幕，请在播放器中开启 CC，并选择 English 字幕');
     }
-    return this.snapshot(selected, handle.time, targetTime, offset, cues);
+    return this.snapshot(selected, capturedTime, targetTime, offset, cues);
   }
 
   previous(context: SentenceContext): SubtitleSnapshot {

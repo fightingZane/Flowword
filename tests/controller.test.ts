@@ -21,6 +21,28 @@ function deferred<T>() {
 }
 
 describe('暂停归属和显式状态机', () => {
+  it('整句可提前发布，关闭后迟到的表达解析不能重开面板', async () => {
+    const { video, subtitles, snapshot } = setup();
+    const pending = deferred<SentenceContext>();
+    const controller = new InteractionController(video, subtitles, async () => assembleSentence(snapshot), 2500,
+      async (context, _signal, emit) => {
+        emit?.({ ...context, learning: { status: 'ready', translation: '这是一条语境译文', candidates: [] } });
+        return pending.promise;
+      });
+    const operation = controller.capture();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(controller.getSnapshot().context?.learning?.translation).toBe('这是一条语境译文');
+    controller.close(); pending.resolve(assembleSentence(snapshot)); await operation;
+    expect(controller.getSnapshot().phase).toBe('IDLE'); controller.dispose();
+  });
+
+  it('字幕跟随整理新句但不会暂停视频', async () => {
+    const { controller, handle, snapshot } = setup();
+    await controller.follow(snapshot);
+    expect(handle.pause).not.toHaveBeenCalled();
+    expect(controller.getSnapshot().context?.text).toBe(snapshot.selected.text);
+    expect(controller.getSnapshot().canResume).toBe(false); controller.dispose();
+  });
   it('点击后在等待分析之前立即暂停', async () => {
     const { video, subtitles, handle, snapshot } = setup();
     const pending = deferred<SentenceContext>();

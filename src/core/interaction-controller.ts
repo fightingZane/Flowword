@@ -9,12 +9,15 @@ export class InteractionController {
   private handle: VideoHandle | null = null;
   private pausedByUs = false;
 
+  // constructor 创建交互控制器，video和subtitles提供播放器与字幕接口
+  // process整理原句，timeout约束本地整理时间，enrich允许分步发布网络结果
+  // 内容脚本创建一次并在失效时dispose，不能把网络耗时当作本地采样超时
   constructor(
     private readonly video: VideoPort,
     private readonly subtitles: SubtitlePort,
     private readonly process: SentenceProcessor = async (snapshot) => assembleSentence(snapshot),
     private readonly timeout = 2500,
-    private readonly enrich?: (context: SentenceContext, signal: AbortSignal) => Promise<SentenceContext>,
+    private readonly enrich?: (context: SentenceContext, signal: AbortSignal, emit?: (context: SentenceContext) => void) => Promise<SentenceContext>,
   ) {}
 
   getSnapshot = (): InteractionState => this.state;
@@ -66,6 +69,35 @@ export class InteractionController {
     }
   }
 
+  // follow 表示跟随当前字幕，snapshot是正在播放的真实字幕快照
+  // 只在用户主动启用字幕跟随时调用，不暂停视频且旧结果不能覆盖新句
+  async follow(snapshot: SubtitleSnapshot): Promise<void> {
+    if (this.state.context?.selected.start === snapshot.selected.start && this.state.context?.selected.text === snapshot.selected.text) return;
+    const operation = this.cancel();
+    this.pausedByUs = false; this.handle = null;
+    try { await this.analyze(snapshot, operation); }
+    catch (error) { if (operation === this.operation) this.publish('ERROR', null, this.message(error)); }
+  }   // 跟随模式只整理正在播放的字幕，不调用pause、不拥有视频暂停状态
+
+  // rebaseHandle 刷新内部播放句柄，无参数，用于重听自己改变时间之后
+  // 只允许同一视频刷新，保留原暂停归属，外部跳转仍必须reset
+  rebaseHandle(): void {
+    if (!this.handle) return;
+    const next = this.video.capture();
+    if (next.key !== this.handle.key) { this.reset(); return; }
+    this.handle = next;
+    this.publish(this.state.phase);   // 内部重听改变时间后刷新句柄，保持原先暂停归属
+  }
+
+  // adoptReplayPause 接管重听句末的暂停，无参数，由重听完成回调调用
+  // 只有当前视频确实暂停才接管，不用于普通手动暂停或其他视频
+  adoptReplayPause(): void {
+    const next = this.video.capture();
+    if (!next.paused) return;
+    this.handle = next; this.pausedByUs = true;
+    this.publish(this.state.phase);   // 用户明确重听后，由插件在句末暂停的新归属
+  }
+
   private async analyze(snapshot: SubtitleSnapshot, operation: number): Promise<void> {
     this.publish('ANALYZING', null);
     const abort = this.abort!;
@@ -87,7 +119,9 @@ export class InteractionController {
       if (operation !== this.operation || signal.aborted) return;
       this.publish('READY', context);   // 先显示本地字幕和排序，不让网络阻塞原文
       if (this.enrich) {
-        const updated = await this.enrich(context, signal);
+        const updated = await this.enrich(context, signal, (partial) => {
+          if (operation === this.operation && !signal.aborted) this.publish('READY', partial);   // 整句先呈现，表达解析不阻塞它
+        });
         if (operation === this.operation && !signal.aborted) this.publish('READY', updated);
       }
     } finally {

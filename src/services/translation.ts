@@ -13,6 +13,7 @@ export function translationText(payload: unknown, original: string): string {
     return number >= 0 && number <= 0x10ffff ? String.fromCodePoint(number) : entity;
   }).trim();
   if (decoded.toLowerCase() === original.trim().toLowerCase()) throw new Error('服务仅返回原文，暂没有可用中文翻译');
+  if (!/[\u3400-\u9fff]/.test(decoded) || /<[^>]*>/.test(decoded)) throw new Error('服务没有返回有效中文译文，请改用云端语境模型');   // 拒绝截图中的纯数字错译和服务HTML
   return decoded;   // 仅输出文本，不将服务返回的 HTML 注入界面
 }
 

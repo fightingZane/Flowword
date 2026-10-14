@@ -1,5 +1,5 @@
 export type Phase = 'IDLE' | 'CAPTURING' | 'ANALYZING' | 'READY' | 'RESUME' | 'ERROR';
-export type SubtitleSource = 'text-track' | 'youtube-dom';
+export type SubtitleSource = 'text-track' | 'youtube-dom' | 'generic-track';
 
 export interface SubtitleSegment {
   text: string;
@@ -28,6 +28,11 @@ export interface SentenceContext extends SubtitleSnapshot {
     translation?: string;
     segmented?: boolean;
     error?: string;
+    provider?: string;
+    expressions?: { text: string; meaning: string; partOfSpeech: string; kind: 'word' | 'phrase'; reason: string }[];
+    contextStatus?: 'loading' | 'ready' | 'error';
+    contextError?: string;
+    timeline?: { text: string; start: number; end: number; translation?: string }[];
     candidates: (VocabularyCandidate & { translation?: string })[];
   };
 }
@@ -55,13 +60,15 @@ export interface Settings {
   onlineTranslation: boolean;
 }
 
+export type Theme = 'auto' | 'light' | 'dark' | 'warm' | 'blue' | 'forest' | 'purple' | 'sunset' | 'rose' | 'ink';
 export interface Appearance {
   fontSize: number;
-  panelTheme: 'auto' | 'light' | 'dark' | 'warm' | 'blue';
+  panelTheme: Theme;
   ballColor: string;
   ballStyle: 'glass' | 'solid' | 'outline';
   ballOpacity: number;
   panelWidth: number;
+  panelHeight?: number;
 }
 
 export interface WordbookEntry {
@@ -75,7 +82,7 @@ export interface WordbookEntry {
   tags: string[];
   createdAt: number;
   updatedAt: number;
-  contexts: { sentence: string; url: string; time: number }[];
+  contexts: { sentence: string; url: string; time: number; title?: string; videoKey?: string; end?: number; translation?: string }[];
 }
 
 // 播放接口仅操作适配器选中的主视频，测试可以替换接口验证竞态

@@ -79,7 +79,7 @@ try {
   await page.screenshot({ path: resolve('test-results/configuration.png') });
   log('右键只配置不暂停，字体主题颜色和风格实时生效');
 
-  const network = page.getByLabel('联网翻译 · MyMemory');
+  const network = page.getByLabel('联网翻译总开关');
   assert.equal(await network.isChecked(), false);
   assert.match(await page.getByRole('dialog').innerText(), /可能长期保存/);
   await network.check();
@@ -108,7 +108,7 @@ try {
   await page.getByLabel('自定义标签', { exact: true }).fill('技术英语，工作表达');
   await page.getByRole('button', { name: '保存到单词本' }).click();
   await page.waitForFunction(() => !document.querySelector('flowword-ui')?.shadowRoot?.querySelector('form'));
-  await page.getByRole('button', { name: '加入整句', exact: true }).click();
+  await page.getByRole('button', { name: '收藏整句', exact: true }).click();
   await page.getByLabel('听力理解', { exact: true }).check();
   await page.getByRole('button', { name: '保存到单词本' }).click();
   await page.waitForFunction(() => !document.querySelector('flowword-ui')?.shadowRoot?.querySelector('form'));
@@ -159,7 +159,7 @@ try {
   log('翻译和查义途中左键可继续，换句不锁死查询，旧译文不覆盖新句');
   await page.getByRole('button', { name: '继续播放并关闭翻译框' }).click(); await idle();
   await ball().click({ button: 'right' });
-  await page.getByLabel('联网翻译 · MyMemory').uncheck();
+  await page.getByLabel('联网翻译总开关').uncheck();
   await page.getByRole('button', { name: '配置完成' }).click();
   const beforeDisabled = (await run.worker.evaluate(() => globalThis.translationRequests)).length;
   await ball().click(); await ready();
@@ -174,7 +174,7 @@ try {
   assert.equal(await page.getByLabel('翻译框主题').inputValue(), 'blue');
   assert.equal(await page.getByLabel('悬浮球风格').inputValue(), 'outline');
   assert.equal(await page.getByLabel('悬浮球颜色').inputValue(), '#cc3344');
-  assert.equal(await page.getByLabel('联网翻译 · MyMemory').isChecked(), false);
+  assert.equal(await page.getByLabel('联网翻译总开关').isChecked(), false);
   const reopened = await run.context.newPage();
   await reopened.goto(`chrome-extension://${run.extensionId}/wordbook.html`);
   await reopened.waitForFunction(() => document.querySelectorAll('.book-card').length === 3);

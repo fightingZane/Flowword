@@ -40,6 +40,18 @@
 .fw-tooltip { position: absolute; right: 66px; white-space: nowrap; padding: 7px 12px; border-radius: 8px; font-size: 11px; font-weight: 400; background: #1c3229e8; color: #e7efdf; opacity: 0; pointer-events: none; transition: opacity .15s; }
 .fw-ball:hover .fw-tooltip, .fw-ball:focus-visible .fw-tooltip { opacity: 1; }
 .fw-bubble { position: fixed; z-index: 2147483647; overflow-y: auto; border: 1px solid #ffffff80; border-radius: 20px; background: var(--fw-paper); box-shadow: var(--fw-shadow); }
+.fw-bubble { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.fw-body { flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
+.fw-header, .fw-footer { flex-shrink: 0; }
+.fw-header { cursor: move; touch-action: none; }
+.fw-resize { position: absolute; right: 2px; bottom: 1px; width: 20px; height: 20px; padding: 0; z-index: 5; cursor: nwse-resize !important; touch-action: none; background: transparent; color: var(--fw-muted) !important; }
+.fw-current-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; position: sticky; top: 0; background: var(--fw-paper); padding: 8px 0; z-index: 1; }
+.fw-neighbor { color: var(--fw-muted); font-size: calc(var(--fw-font) * .8); line-height: 1.6; margin: 8px 0; opacity: .85; }
+.fw-neighbor p { margin: 4px 0; }
+.fw-context-expression { animation: fw-context-in .2s ease-out; }
+.fw-learning { animation: fw-context-in .25s ease-out; }
+@media (prefers-reduced-motion: reduce) { .fw-learning, .fw-context-expression { animation: none !important; } }
+@keyframes fw-context-in { from { opacity: .4; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .fw-header { display: flex; justify-content: space-between; align-items: center; padding: 17px 19px 15px; border-bottom: 1px solid var(--fw-line); }
 .fw-brand { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; }
 .fw-mini-mark { display: flex; padding: 4px; border-radius: 7px; color: var(--fw-green); background: var(--fw-wash); }
@@ -102,11 +114,17 @@
 .fw-app[data-theme="dark"] { --fw-paper: #202b25; --fw-ink: #e4ebdf; --fw-muted: #a2afa1; --fw-line: #37483c; --fw-green: #5a7c5d; --fw-wash: #28382d; }
 .fw-app[data-theme="warm"] { --fw-paper: #fff5e6; --fw-ink: #493929; --fw-muted: #79694e; --fw-line: #e7d9bd; --fw-green: #7c623c; --fw-wash: #f5e8d0; }
 .fw-app[data-theme="blue"] { --fw-paper: #eff6fc; --fw-ink: #203f5b; --fw-muted: #5f7990; --fw-line: #d3e2ee; --fw-green: #396b90; --fw-wash: #e0edf6; }
+.fw-app[data-theme="forest"] { --fw-paper: #eaf1e9; --fw-ink: #193d2e; --fw-muted: #496d5d; --fw-line: #c6d9cb; --fw-green: #2a6244; --fw-wash: #dce9dc; }
+.fw-app[data-theme="purple"] { --fw-paper: #f1edfa; --fw-ink: #382750; --fw-muted: #716083; --fw-line: #d9ceea; --fw-green: #715496; --fw-wash: #e6def3; }
+.fw-app[data-theme="sunset"] { --fw-paper: #fff0e6; --fw-ink: #532d20; --fw-muted: #875d48; --fw-line: #eecbbb; --fw-green: #a74f32; --fw-wash: #fbe0ce; }
+.fw-app[data-theme="rose"] { --fw-paper: #faf0f3; --fw-ink: #542c3f; --fw-muted: #865e73; --fw-line: #ebccd9; --fw-green: #995571; --fw-wash: #f2dfe7; }
+.fw-app[data-theme="ink"] { --fw-paper: #202124; --fw-ink: #f1e8d2; --fw-muted: #bbb099; --fw-line: #444037; --fw-green: #827144; --fw-wash: #2d2b26; }
+.fw-app[data-theme]:not([data-theme="auto"]) .fw-tools button, .fw-app[data-theme]:not([data-theme="auto"]) .fw-retry { color: var(--fw-ink) !important; }
 .fw-app[data-theme="dark"] .fw-tools button, .fw-app[data-theme="dark"] .fw-retry { color: #b8d1a8 !important; }
 .fw-learning { margin: 18px 0; border-top: 1px solid var(--fw-line); padding-top: 16px; }
 .fw-translation-label, .fw-learning-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: calc(var(--fw-font) * .875); font-weight: 600; }
 .fw-translation-label > span, .fw-learning-title > span { font-size: calc(var(--fw-font) * .75); color: var(--fw-muted); font-weight: 400; }
-.fw-translation { font-size: calc(var(--fw-font) * 1.125); line-height: 1.8; margin: 10px 0 20px; }
+.fw-translation { font-size: calc(var(--fw-font) * 1.3); line-height: 1.65; margin: 10px 0 20px; }
 .fw-learning-note { color: var(--fw-muted); font-size: calc(var(--fw-font) * .875); line-height: 1.8; }
 .fw-learning-note button, .fw-candidate button { border: 0; background: transparent; color: var(--fw-green); padding: 4px 6px; font-size: calc(var(--fw-font) * .875); }
 .fw-candidate { border-bottom: 1px solid var(--fw-line); padding: 13px 0; }

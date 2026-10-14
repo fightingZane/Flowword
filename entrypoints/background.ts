@@ -1,60 +1,63 @@
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { STORAGE } from '../src/storage/settings';
-import { requestTranslation, splitTranslation, validTranslationInput } from '../src/services/translation';
+import { effectiveProvider, learningRequest } from '../src/services/learning-background';
 import { allEntries, deleteEntry, saveEntry } from '../src/storage/wordbook';
 
 export default defineBackground(() => {
-  const cache = new Map<string, string>();
-  const pending = new Map<string, Promise<string>>();
-  let queue = Promise.resolve();
-  let queued = 0;
-
-  async function translate(text: string): Promise<string> {
-    if (cache.has(text)) return cache.get(text)!;
-    if (pending.has(text)) return pending.get(text)!;
-    if (queued >= 16) throw new Error('翻译请求较多，请稍后再试');
-    queued++;
-    const task = queue.then(async () => {
-      const stored = await browser.storage.local.get(STORAGE.onlineTranslation);
-      if (stored[STORAGE.onlineTranslation] !== true) throw new Error('请先在右键配置中开启联网翻译');
-      try {
-        const translated = await requestTranslation(text);
-        cache.set(text, translated);
-        if (cache.size > 200) cache.delete(cache.keys().next().value!);
-        return translated;
-      } finally { await new Promise((resolve) => setTimeout(resolve, 250)); }   // 成功和失败都限速，避免请求洪峰
-    });
-    pending.set(text, task);
-    queue = task.then(() => {}, () => {});
-    void task.finally(() => { queued--; pending.delete(text); }).catch(() => {});
-    return task;
-  }
-
+  let prefetchQueue = Promise.resolve();
   browser.runtime.onMessage.addListener((message, sender) => {
-    const internal = sender.id === browser.runtime.id && (sender.url?.startsWith('https://www.youtube.com/') || sender.url?.startsWith(browser.runtime.getURL('/')));
+    const internal = sender.id === browser.runtime.id && ((/^https?:\/\//.test(sender.url ?? '')) || sender.url?.startsWith(browser.runtime.getURL('/')));
     if (!internal || !message || typeof message !== 'object') return;
     return (async () => {
       try {
-        if (message.type === 'FLOWWORD_TRANSLATE') {
-          const stored = await browser.storage.local.get(STORAGE.onlineTranslation);
-          if (stored[STORAGE.onlineTranslation] !== true) throw new Error('请先开启联网翻译');
-          if (typeof message.sentence !== 'string' || !Array.isArray(message.words) || message.words.length > 3) throw new Error('翻译请求无效');
-          const chunks = splitTranslation(message.sentence);
-          const words: Record<string, string> = {};
-          let translation: string | undefined;
-          const errors: string[] = [];
-          try {
-            const pieces: string[] = [];
-            for (const chunk of chunks) pieces.push(await translate(chunk));
-            translation = pieces.join(' ');
-          } catch (error) { errors.push(chunks.length > 1 ? '分段翻译未完整成功，请重试' : error instanceof Error ? error.message : '整句翻译失败'); }
-          for (const item of message.words) {
-            if (!validTranslationInput(item?.text) || item.text.length > 100) continue;
-            if (typeof item.meaning === 'string' && item.meaning.length < 500) { words[item.text] = item.meaning; continue; }
-            try { words[item.text] = await translate(item.text); } catch { errors.push(`${item.text} 暂无参考译文`); }
+        const extensionPage = sender.url?.startsWith(browser.runtime.getURL('/')) === true;
+        if (message.type === 'FLOWWORD_PROVIDER_CHANGED' && extensionPage) {
+          const config = await effectiveProvider();
+          const publicConfig = { mode: config.mode, model: config.model, prefetch: config.prefetch, configured: config.mode !== 'cloud' || !!config.apiKey };
+          for (const tab of await browser.tabs.query({})) if (tab.id !== undefined) void browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_PROVIDER_CHANGED', ...publicConfig }).catch(() => {});
+          return { ok: true };
+        }
+        if (message.type === 'FLOWWORD_PROVIDER_PUBLIC') {
+          const config = await effectiveProvider();
+          return { ok: true, mode: config.mode, model: config.model, prefetch: config.prefetch, configured: config.mode !== 'cloud' || !!config.apiKey };
+        }
+        if (message.type === 'FLOWWORD_SETTINGS_OPEN') { await browser.tabs.create({ url: browser.runtime.getURL('/settings.html') }); return { ok: true }; }
+        if (message.type === 'FLOWWORD_TRANSLATE' || message.type === 'FLOWWORD_CONTEXT') {
+          const context = Array.isArray(message.context) ? message.context.filter((value: unknown): value is string => typeof value === 'string' && value.length <= 2000).slice(0, 2) : [];
+          return { ok: true, ...await learningRequest(message.sentence, context, message.type === 'FLOWWORD_CONTEXT' ? 'context' : 'translate') as object };
+        }
+        if (message.type === 'FLOWWORD_PREFETCH') {
+          const config = await effectiveProvider();
+          if (!config.prefetch || config.mode !== 'cloud') return { ok: true, skipped: true };
+          const rawItems = Array.isArray(message.items) ? message.items : Array.isArray(message.sentences) ? message.sentences.map((sentence: unknown) => ({ sentence, context: [] })) : [];
+          const items: { sentence: string; context: string[] }[] = [];
+          for (const item of rawItems.slice(0, 2)) {
+            if (typeof item?.sentence !== 'string' || !item.sentence.trim() || item.sentence.length > 2000) continue;
+            const context: string[] = Array.isArray(item.context) ? item.context.filter((value: unknown): value is string => typeof value === 'string' && value.length <= 2000).slice(0, 2) : [];
+            items.push({ sentence: item.sentence, context });
           }
-          return { ok: true, translation, words, segmented: chunks.length > 1, error: errors.length ? errors.join('；') : undefined };
+          const budgetKey = `prefetch:${sender.tab?.id ?? 'extension'}`;
+          const reservation = prefetchQueue.then(async () => {
+            const stored = await browser.storage.session.get(budgetKey);
+            const used = Number(stored[budgetKey] || 0);
+            const reserved = items.slice(0, Math.max(0, 20-used));
+            await browser.storage.session.set({ [budgetKey]: used + reserved.length });
+            return reserved;
+          });
+          prefetchQueue = reservation.then(() => {}, () => {});
+          const reserved = await reservation;
+          const results = await Promise.allSettled(reserved.map((item) => learningRequest(item.sentence, item.context, 'translate', 'prefetch')));
+          return { ok: true, results: results.map((result, index) => ({ text: reserved[index]?.sentence, ...(result.status === 'fulfilled' ? result.value as object : { error: '预译失败' }) })) };
+        }
+        if (message.type === 'FLOWWORD_ENABLE_SITE' && extensionPage) {
+          const origin = new URL(message.origin).origin;
+          if (!/^https?:/.test(origin) || !await browser.permissions.contains({ origins: [origin + '/*'] })) throw new Error('请先通过浏览器授权该网站');
+          const id = `flowword-site-${encodeURIComponent(origin).replace(/%/g, '-')}`;
+          if (origin === 'https://www.youtube.com') return { ok: true };
+          const registered = await browser.scripting.getRegisteredContentScripts({ ids: [id] });
+          if (!registered.length) await browser.scripting.registerContentScripts([{ id, matches: [origin + '/*'], js: ['content-scripts/flowword.js'], runAt: 'document_idle', persistAcrossSessions: true }]);
+          return { ok: true };
         }
         if (message.type === 'FLOWWORD_BOOK_SAVE') {
           const entry = await saveEntry(message.entry, typeof message.replaceId === 'string' ? message.replaceId : undefined);
@@ -70,6 +73,26 @@ export default defineBackground(() => {
       } catch (error) { return { ok: false, error: error instanceof Error ? error.message : '操作失败，请重试' }; }
     })();
   });   // 只接收本扩展页面和自己的 YouTube 内容脚本，不允许任意网页调用服务
+  browser.permissions.onRemoved.addListener((removed) => {
+    void (async () => {
+      if (!removed.origins?.length) return;
+      const registered = await browser.scripting.getRegisteredContentScripts();
+      const checks = await Promise.all(registered.filter((script) => script.id.startsWith('flowword-site-')).map(async (script) => ({ script, allowed: await browser.permissions.contains({ origins: script.matches ?? [] }) })));
+      const revoke = checks.filter((item) => !item.allowed).map((item) => item.script);
+      if (!revoke.length) return;
+      await browser.scripting.unregisterContentScripts({ ids: revoke.map((script) => script.id) });
+      const revokedMatches = revoke.flatMap((script) => script.matches ?? []);
+      for (const tab of await browser.tabs.query({})) if (tab.id !== undefined) void browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_SITE_REVOKED', origins: revokedMatches }).catch(() => {});
+    })().catch(() => {});
+  });   // 只撤销已注册网站脚本，接口授权不会被误当成视频站授权
+  browser.commands.onCommand.addListener((command) => {
+    void (async () => {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id === undefined) return;
+      const action = command === 'flowword-toggle' ? 'toggle-playback' : command === 'flowword-repeat' ? 'repeat-sentence' : undefined;
+      if (action) await browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_COMMAND', command: action });
+    })().catch(() => {});
+  });   // 扩展快捷键只作用于当前活动标签页，不拦截输入框普通按键
   async function updateBadge() {
     const stored = await browser.storage.local.get(STORAGE.enabled);
     const enabled = stored[STORAGE.enabled] === true;

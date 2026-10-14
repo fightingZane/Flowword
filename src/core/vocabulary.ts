@@ -60,6 +60,8 @@ const BASIC_WORDS = new Set((
 
 // 人工分层只帮助初始排序，没有校准为词频、CEFR、四六级或用户陌生程度
 const WORD_PRIORITY: Record<string, number> = {
+  telephoto: 95, semiconductor: 95, latency: 90, throughput: 92, refraction: 92,
+  'high-refresh': 88, 'refresh-rate': 88, benchmark: 87, firmware: 90,
   obscure: 82, underwhelming: 80, counterintuitive: 86, unprecedented: 84,
   meticulous: 85, ambiguous: 77, subtle: 70, constraint: 72, feasible: 72,
   redundant: 70, resilient: 78, intriguing: 78, pitfall: 76, underlying: 72,
@@ -78,6 +80,9 @@ const WORD_PRIORITY: Record<string, number> = {
 
 // 以下释义由项目自行撰写，保留多义提示，不声称已完成上下文词义消歧
 const PHRASE_DATA: Array<[string, string, number]> = [
+  ['telephoto lens', '长焦镜头；可在较远距离拍摄更紧的取景画面', 97],
+  ['refresh rate', '刷新率；显示器每秒更新画面的次数', 93],
+  ['high-refresh display', '高刷新率显示屏', 94],
   ['come across', '偶然遇到；偶然发现', 82],
   ['figure out', '弄明白；想出解决办法', 78],
   ['put up with', '忍受；容忍', 84],

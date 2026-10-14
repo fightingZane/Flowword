@@ -4,6 +4,11 @@ import { filterWordbook } from '../src/core/wordbook-filters';
 
 const make = (text: string, kind: 'word' | 'phrase' | 'sentence' = 'word') => validateEntry({ text, kind, translation: '测试译文', partOfSpeech: '名词', examTags: ['词义辨析', '四级'], tags: ['工作表达'], contexts: [{ sentence: 'An observed sentence.', url: 'https://www.youtube.com/watch?v=test', time: 12 }] });
 describe('单词本去重与多维分类', () => {
+  it('相同网页、时间和原句的不同媒体来源不能合并', () => {
+    const previous = make('charge'); previous.contexts[0]!.videoKey = 'media-a';
+    const next = make('charge'); next.contexts[0]!.videoKey = 'media-b';
+    expect(mergeEntries(previous, next).contexts.map((context) => context.videoKey)).toEqual(['media-a', 'media-b']);
+  });
   it('同类型英文大小写和空白不会生成重复条目', () => expect(make(' Standpoint ').id).toBe(make('standpoint').id));
   it('词条与整句分类是独立键', () => expect(make('test', 'sentence').id).not.toBe(make('test', 'word').id));
   it('重复加入保留创建时间，合并标签而不丢原译文', () => {

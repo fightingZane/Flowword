@@ -1,9 +1,13 @@
-# FlowWord 0.2 架构
+# FlowWord 0.3 架构
 
-WXT + React + TypeScript，Chrome MV3，YouTube Shadow DOM界面。
+WXT + React + TypeScript，Chrome MV3。内容脚本runtime编译，manifest唯一静态匹配YouTube，其他站按可选权限动态注册。CSS作为web-accessible资源手动送入Shadow UI，不以CSS可读范围代替网站读取授权。
 
-字幕适配器读取轨道与页面字幕；InteractionController 管理捕获和暂停所有权，以操作编号和 AbortSignal 拒绝旧结果。候选分析本地运行，核验八词先显示本地多义参考。允许联网时通过 background 请求固定 MyMemory 服务，缓存、串行队列、失败限速、UTF8分段；部分失败不标为完整翻译。
+YouTube适配器继续读取页面字幕/轨道；Generic适配器只识别顶层可见主HTML5视频与单一有效英文轨道。Subtitle Timeline整理真实当前及邻句，统一预译与点击的拼句/上下文缓存键。
 
-再次点击恢复所属视频并清理面板。已发出的服务请求不会因关框撤销，但迟到结果不覆盖当前句。外观设置队列避免快速更新相互覆盖。
+InteractionController以操作编号与AbortSignal阻止过期结果；enrich可分步emit整句再表达。Follow不暂停视频。独立ReplayController按视频时间重听，自己的seek/play有所有权，外部跳转或换源取消，句末暂停产生新的暂停归属。
 
-词本在扩展 origin 的 IndexedDB，后台校验、去重合并、编辑标签可移除、重命名碰撞校验。独立词本页组合筛选；通知与窗口返回刷新，导出重新读取全部最新数据。
+云服务在background运行，完整HTTPS端点与密钥只在独立设置页配置。Key存在provider IndexedDB，公开消息只返回mode/model/prefetch/configured。请求禁止redirect、不带Cookie/referrer、输入是字幕数据，结果校验中文、JSON和原文表达跨度。MyMemory仅整句并保留限速。缓存绑定服务、模型、任务、原句和邻语境；预译单独开关与会话预算。
+
+旧词本库保持version1，新archive库分别保存video/capture/occurrence，保留同词多来源语境。首次迁移是幂等操作，不删除旧库。跨库事务不能原子提交，失败可重试；v2备份包含词本和归档，v1也可导入。
+
+浮框固定width/height，以flex内滚动支持字体独立。Pointer Capture处理移动/缩放，抬起用最后尺寸ref防同帧旧state。词本主题独立保存。
