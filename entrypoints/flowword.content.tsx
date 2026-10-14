@@ -4,8 +4,12 @@ import { defineContentScript } from 'wxt/utils/define-content-script';
 import { createShadowRootUi } from 'wxt/utils/content-script-ui/shadow-root';
 import { YouTubeSubtitleAdapter, YouTubeVideoController, videoKey } from '../src/adapters/youtube';
 import { InteractionController } from '../src/core/interaction-controller';
+import { assembleSentence } from '../src/core/sentence';
+import { analyzeVocabulary } from '../src/core/vocabulary';
+import { getCuratedMeaning } from '../src/core/curated-meanings';
+import { enrichLearning } from '../src/services/learning';
 import type { PageStatus, Settings } from '../src/core/types';
-import { readSettings, STORAGE, writeSetting } from '../src/storage/settings';
+import { readSettings, STORAGE, writeAppearance, writeSetting } from '../src/storage/settings';
 import { FloatingApp } from '../src/ui/FloatingApp';
 import '../src/ui/floating.css';
 
@@ -17,7 +21,13 @@ export default defineContentScript({
     let settings = await readSettings();
     const videos = new YouTubeVideoController();
     const subtitles = new YouTubeSubtitleAdapter(videos);
-    const controller = new InteractionController(videos, subtitles);
+    const controller = new InteractionController(videos, subtitles, async (snapshot) => {
+      const context = assembleSentence(snapshot);
+      const current = await readSettings();
+      const candidates = analyzeVocabulary(context.text).map((candidate) => ({ ...candidate,
+        meaning: candidate.meaning ?? getCuratedMeaning(candidate.lemma)?.meaning }));   // 核验通用义可离线显示，不自动判断当前词性
+      return { ...context, learning: { status: current.onlineTranslation ? 'loading' : 'disabled', candidates } };
+    }, 2500, enrichLearning);
     let root: Root | undefined;
     let mounted = false;
     let currentVideoKey = videoKey();
@@ -27,14 +37,16 @@ export default defineContentScript({
     function render() {
       root?.render(<FloatingApp controller={controller} settings={settings}
         onPosition={(position) => writeSetting('position', position)}
-        onOffset={(offset) => writeSetting('offset', offset)} />);
+        onOffset={(offset) => writeSetting('offset', offset)}
+        onAppearance={writeAppearance}
+        onOnlineTranslation={(value) => writeSetting('onlineTranslation', value)} />);
     }
 
     const ui = await createShadowRootUi(ctx, {
       name: 'flowword-ui',
       position: 'inline',
       anchor: 'body',
-      isolateEvents: ['keydown', 'keyup', 'keypress', 'click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'pointercancel'],
+      isolateEvents: ['keydown', 'keyup', 'keypress', 'click', 'dblclick', 'contextmenu', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'pointercancel'],
       onMount(container) {
         const app = document.createElement('div');
         container.append(app);

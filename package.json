@@ -2,7 +2,7 @@
   "name": "flowword",
   "description": "低干扰的 YouTube 英语字幕悬浮助手",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -11,10 +11,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "node scripts/e2e.mjs",
+    "test:features": "node scripts/features-e2e.mjs",
+    "test:translation": "node scripts/translation-live.mjs",
     "test:youtube": "node scripts/youtube-smoke.mjs",
     "browser:install": "node scripts/install-browser.mjs",
     "package": "node scripts/package.mjs",
-    "verify": "npm run typecheck && npm test && npm run build && npm run test:e2e",
+    "verify": "npm run typecheck && npm test && npm run build && npm run test:e2e && npm run test:features",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

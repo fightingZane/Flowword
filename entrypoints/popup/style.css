@@ -33,6 +33,16 @@ footer { padding-top: 16px; border-top: 1px solid #e1e7da; }
 footer button { border: 0; padding: 0; background: none; color: #5c7751; font-size: 10px; display: flex; align-items: center; gap: 8px; }
 footer > span { display: block; margin-top: 15px; color: #a1ad97; font-size: 8px; letter-spacing: .5px; }
 .error { color: #95664a; font-size: 10px; }
+:root { font-size: 16px; }
+body { width: 400px; }
+.eyebrow { font-size: 10px; }
+.wordmark { font-size: 22px; }
+.version { font-size: 13px; }
+h1 { font-size: 34px; }
+.intro p, .page-hint, .howto p, footer button, .error { font-size: 14px; }
+.switch-card strong { font-size: 16px; }
+.switch-card div > span, footer > span, .howto > div > span { font-size: 13px; }
+footer button { margin-bottom: 12px; }
 @media (prefers-color-scheme: dark) {
   :root { background: #202b25; color: #e1ebdc; color-scheme: dark; }
   .switch-card { background: #2b3b2d; border-color: #3b4d3c; }

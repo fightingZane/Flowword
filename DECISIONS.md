@@ -63,3 +63,11 @@ DOM 通常不能可靠确认语言，因此记录 und 并要求用户确认 Engl
 MAIN world 修改 video.duration 不会改变内容脚本 ISOLATED world 的原生属性，因此不采用属性覆盖模拟有限视频。用户指定的技术决策子代理生成自建 90 秒 VP8 WebM，浏览器两个 world 的原生 duration 均为 90。HTTP 路由支持 Range / 206，验证真实 seeking 完成。
 
 媒体由本项目脚本绘制，无第三方素材，不增加生产依赖。直播拒绝另用真实 MediaStream 测试。
+
+## D010：0.2 翻译与词本
+
+联网默认关闭，用户在右键配置中主动开启。采用固定 MyMemory GET 服务，不使用未经说明的Google接口或上传用户视频地址；匿名服务有额度，字幕可能长期保存并交给第三方机译处理。依据：https://mymemory.translated.net/doc/spec.php 与 https://mymemory.translated.net/terms-and-conditions
+
+整句UTF8分段，失败不标完整成功。候选是本地难度参考，不是个人不会概率。通用义未经语境消歧；八词自编中文义以Cambridge词典核验并保留链接，词性由用户确定。技术决策子代理使用用户指定GPT-6.1-sol Max完成方案与多轮审查；末次集成复审因用量限制未执行，主代理完成类型、单元和浏览器验证。
+
+词本采用本地IndexedDB，重复合并，编辑可移除标签，导出读取最新完整数据。保留旧版加载目录更新内容，避免卸载导致数据丢失。

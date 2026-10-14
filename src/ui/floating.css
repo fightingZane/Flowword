@@ -82,3 +82,60 @@
   .fw-tools button, .fw-retry { color: #b8d1a8 !important; }
 }
 @media (prefers-reduced-motion: reduce) { .fw-app * { transition: none !important; animation-duration: 1.5s !important; } }
+
+/* 统一使用可调字号，辅助文字和操作按钮一起放大 */
+.fw-app { font-size: var(--fw-font, 16px); }
+.fw-brand { font-size: var(--fw-font); }
+.fw-brand-caption, .fw-eyebrow, .fw-context-note, .fw-time, .fw-tools button, .fw-offset, .fw-offset select, .fw-footer > span, .fw-primary, .fw-retry, .fw-notice, .fw-inline-error p { font-size: calc(var(--fw-font) * .875) !important; }
+.fw-sentence { font-size: calc(var(--fw-font) * 1.75); }
+.fw-error h2, .fw-loading p { font-size: calc(var(--fw-font) * 1.125); }
+.fw-error p, .fw-loading > span, .fw-tooltip { font-size: calc(var(--fw-font) * .875); }
+.fw-tools { flex-wrap: wrap; gap: 12px; }
+.fw-header { position: sticky; top: 0; z-index: 2; background: var(--fw-paper); }
+.fw-header-config { background: transparent; color: var(--fw-green) !important; padding: 4px 8px; font-size: calc(var(--fw-font) * .875) !important; margin-left: auto; }
+.fw-icon-button { width: 32px; height: 32px; }
+.fw-footer { position: sticky; bottom: 0; z-index: 1; }
+.fw-ball, .fw-ball:hover, .fw-ball:focus-visible, .fw-ball.is-open { background: color-mix(in srgb, var(--fw-ball-color, #355f47) 85%, transparent); opacity: var(--fw-ball-opacity, .9); }
+.fw-app[data-ball-style="solid"] .fw-ball { background: var(--fw-ball-color); backdrop-filter: none; }
+.fw-app[data-ball-style="outline"] .fw-ball { background: var(--fw-paper); border: 2px solid var(--fw-ball-color) !important; color: var(--fw-ball-color) !important; backdrop-filter: none; }
+.fw-app[data-theme="light"] { --fw-paper: #f8f9f5; --fw-ink: #23352d; --fw-muted: #65736a; --fw-line: #e1e7df; --fw-green: #355f47; --fw-wash: #eef2e9; }
+.fw-app[data-theme="dark"] { --fw-paper: #202b25; --fw-ink: #e4ebdf; --fw-muted: #a2afa1; --fw-line: #37483c; --fw-green: #5a7c5d; --fw-wash: #28382d; }
+.fw-app[data-theme="warm"] { --fw-paper: #fff5e6; --fw-ink: #493929; --fw-muted: #79694e; --fw-line: #e7d9bd; --fw-green: #7c623c; --fw-wash: #f5e8d0; }
+.fw-app[data-theme="blue"] { --fw-paper: #eff6fc; --fw-ink: #203f5b; --fw-muted: #5f7990; --fw-line: #d3e2ee; --fw-green: #396b90; --fw-wash: #e0edf6; }
+.fw-app[data-theme="dark"] .fw-tools button, .fw-app[data-theme="dark"] .fw-retry { color: #b8d1a8 !important; }
+.fw-learning { margin: 18px 0; border-top: 1px solid var(--fw-line); padding-top: 16px; }
+.fw-translation-label, .fw-learning-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: calc(var(--fw-font) * .875); font-weight: 600; }
+.fw-translation-label > span, .fw-learning-title > span { font-size: calc(var(--fw-font) * .75); color: var(--fw-muted); font-weight: 400; }
+.fw-translation { font-size: calc(var(--fw-font) * 1.125); line-height: 1.8; margin: 10px 0 20px; }
+.fw-learning-note { color: var(--fw-muted); font-size: calc(var(--fw-font) * .875); line-height: 1.8; }
+.fw-learning-note button, .fw-candidate button { border: 0; background: transparent; color: var(--fw-green); padding: 4px 6px; font-size: calc(var(--fw-font) * .875); }
+.fw-candidate { border-bottom: 1px solid var(--fw-line); padding: 13px 0; }
+.fw-candidate-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fw-candidate-title strong { font-size: calc(var(--fw-font) * 1.125); overflow-wrap: anywhere; }
+.fw-candidate-title button { margin-left: auto; border-radius: 7px; background: var(--fw-wash); }
+.fw-rank { color: var(--fw-muted); font-variant-numeric: tabular-nums; font-size: calc(var(--fw-font) * .875); }
+.fw-kind, .fw-candidate-reason { font-size: calc(var(--fw-font) * .75); color: var(--fw-muted); }
+.fw-candidate > p { margin: 7px 0 3px 19px; font-size: var(--fw-font); line-height: 1.6; }
+.fw-candidate-reason { display: block; margin-left: 19px; }
+.fw-settings, .fw-save-form { font-size: var(--fw-font); }
+.fw-settings-intro { color: var(--fw-muted); font-size: calc(var(--fw-font) * .875); margin: 0 0 18px; line-height: 1.8; }
+.fw-settings > label, .fw-save-form > label, .fw-form-row > label { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; justify-content: space-between; margin: 15px 0; }
+.fw-settings input[type="range"] { width: 100%; accent-color: var(--fw-green); }
+.fw-settings select, .fw-save-form select, .fw-save-form input, .fw-save-form textarea { border: 1px solid var(--fw-line); border-radius: 8px; background: var(--fw-paper); color: var(--fw-ink); padding: 9px; font: inherit; }
+.fw-settings select { max-width: 60%; }
+.fw-settings output { color: var(--fw-muted); font-size: calc(var(--fw-font) * .875); }
+.fw-settings input[type="color"] { border: 0; width: 60px; height: 36px; padding: 0; background: transparent; cursor: pointer; }
+.fw-network-setting { border: 1px solid var(--fw-line); padding: 14px; border-radius: 12px; margin: 18px 0; }
+.fw-network-setting label { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.fw-network-setting input, .fw-tag-options input { width: 18px; height: 18px; accent-color: var(--fw-green); }
+.fw-network-setting p { font-size: calc(var(--fw-font) * .875); color: var(--fw-muted); line-height: 1.9; }
+.fw-save-form h2 { font-size: calc(var(--fw-font) * 1.2); margin: 0 0 10px; }
+.fw-save-form textarea, .fw-save-form > label > input { width: 100%; resize: vertical; min-height: 44px; }
+.fw-form-row { display: flex; flex-wrap: wrap; gap: 14px; }
+.fw-form-row > label { flex: 1; min-width: 130px; }
+.fw-save-form fieldset { border: 1px solid var(--fw-line); border-radius: 10px; padding: 12px; margin: 15px 0; }
+.fw-tag-options { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.fw-tag-options label { display: flex; align-items: center; gap: 6px; font-size: calc(var(--fw-font) * .875); }
+.fw-save-actions { display: flex; justify-content: space-between; gap: 12px; margin: 20px 0 6px; }
+.fw-app:not([data-theme="auto"]) .fw-tools button, .fw-app:not([data-theme="auto"]) .fw-retry { color: var(--fw-ink) !important; }
+.fw-app:not([data-theme="auto"]) .fw-mini-mark { color: var(--fw-green); }

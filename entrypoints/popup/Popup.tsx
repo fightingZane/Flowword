@@ -61,7 +61,7 @@ export function Popup() {
   }
 
   return <main className="popup">
-    <header><div className="logo"><FlowMark size={24} /></div><span className="wordmark">FlowWord</span><span className="version">0.1</span></header>
+    <header><div className="logo"><FlowMark size={24} /></div><span className="wordmark">FlowWord</span><span className="version">0.2</span></header>
     <div className="intro"><span className="eyebrow">A SMALL PAUSE. A LITTLE MORE CLARITY.</span><h1>停一下，<br /><span>看懂这一句。</span></h1><p>在英文视频里，留住刚才没听懂的字幕。<br />不必复制，不必离开。</p></div>
     <section className={`switch-card ${settings.enabled ? 'enabled' : ''}`}>
       <div><strong>YouTube 悬浮球</strong><span>{settings.enabled ? '已开启 · 在视频页显示' : '已关闭 · 由你决定何时开启'}</span></div>
@@ -70,6 +70,6 @@ export function Popup() {
     <p className="page-hint" role="status"><span className={page ? 'connected' : ''} />{hint}</p>
     {error && <p className="error" role="alert">{error}</p>}
     <div className="howto"><div><span>01</span><p>打开视频的 <b>English 字幕</b></p></div><div><span>02</span><p>点击悬浮球，暂停并查看原文</p></div><div><span>03</span><p>点击「继续观看」，接着听</p></div></div>
-    <footer><button type="button" onClick={() => void resetPosition()}>重置悬浮球位置<Icon name="arrow" size={14} /></button><span>本地运行 · 无需登录</span></footer>
+    <footer><button type="button" onClick={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })}>打开单词本<Icon name="arrow" size={14} /></button><button type="button" onClick={() => void resetPosition()}>重置悬浮球位置<Icon name="arrow" size={14} /></button><span>右键悬浮球配置外观与联网翻译</span></footer>
   </main>;
 }

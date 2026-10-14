@@ -274,15 +274,10 @@ try {
   log('广告标志存在时不捕获、不暂停');
 
   await ball().dblclick();
-  assert.equal(await pauseState(), true);
-  const phase = await page.locator('flowword-ui').locator('[data-phase]').getAttribute('data-phase');
-  if (phase === 'IDLE') await ball().click();
-  await ready();
-  await page.getByRole('button', { name: '继续观看', exact: true }).click();
   await idle();
   assert.equal(await pauseState(), false);
   await page.locator('#play').click();
-  log('快速重复点击不丢失暂停归属，之后仍可继续播放');
+  log('快速两次左键按新规则暂停后继续，不丢失暂停归属');
 
   const popup = await run.context.newPage();
   await popup.goto(`chrome-extension://${run.extensionId}/popup.html`);

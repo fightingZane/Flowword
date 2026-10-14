@@ -1,5 +1,5 @@
 import { assembleSentence } from './sentence';
-import type { InteractionState, SentenceProcessor, SubtitlePort, SubtitleSnapshot, VideoHandle, VideoPort } from './types';
+import type { InteractionState, SentenceContext, SentenceProcessor, SubtitlePort, SubtitleSnapshot, VideoHandle, VideoPort } from './types';
 
 export class InteractionController {
   private state: InteractionState = { phase: 'IDLE', context: null, error: null, canResume: false };
@@ -14,6 +14,7 @@ export class InteractionController {
     private readonly subtitles: SubtitlePort,
     private readonly process: SentenceProcessor = async (snapshot) => assembleSentence(snapshot),
     private readonly timeout = 2500,
+    private readonly enrich?: (context: SentenceContext, signal: AbortSignal) => Promise<SentenceContext>,
   ) {}
 
   getSnapshot = (): InteractionState => this.state;
@@ -81,7 +82,14 @@ export class InteractionController {
         signal.addEventListener('abort', cancelled, { once: true });
       });
       const context = await Promise.race([this.process(snapshot, signal), deadline]);
-      if (operation === this.operation && !signal.aborted) this.publish('READY', context);
+      clearTimeout(timer);
+      if (cancelled) signal.removeEventListener('abort', cancelled);
+      if (operation !== this.operation || signal.aborted) return;
+      this.publish('READY', context);   // 先显示本地字幕和排序，不让网络阻塞原文
+      if (this.enrich) {
+        const updated = await this.enrich(context, signal);
+        if (operation === this.operation && !signal.aborted) this.publish('READY', updated);
+      }
     } finally {
       clearTimeout(timer);   // 成功、失败和超时都回收定时器
       if (cancelled) signal.removeEventListener('abort', cancelled);

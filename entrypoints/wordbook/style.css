@@ -1,0 +1,24 @@
+body { margin: 0; background: #f1f4ed; color: #23352d; font: 16px/1.7 "Segoe UI", "Microsoft YaHei", sans-serif; }
+.book { max-width: 1200px; margin: auto; padding: 36px; }
+.book-header, .book-header > div { display: flex; align-items: center; justify-content: space-between; gap: 13px; }
+.book-header span { font-size: 25px; font-weight: 650; }
+.book-header small { font-size: 16px; color: #72806a; margin-left: 10px; font-weight: 400; }
+.book h1 { font-size: 34px; margin: 34px 0 10px; }
+.book-subtitle, .book-count { color: #6b7b62; font-size: 15px; }
+.book-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+.book-filters input, .book-filters select { font: inherit; padding: 11px; border: 1px solid #d9e2d2; border-radius: 9px; background: #fff; color: #23352d; max-width: 100%; }
+.book-filters input { flex: 1; min-width: 250px; }
+.book-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 20px; }
+.book-card { background: #fff; padding: 24px; border: 1px solid #e1e8da; border-radius: 17px; }
+.book-card-meta { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; font-size: 14px; color: #7a896e; }
+.book-card-meta button, .book-delete { border: 0; background: transparent; color: #456842; font: inherit; cursor: pointer; }
+.book-card h2 { font: 26px/1.5 Georgia, serif; margin: 16px 0; overflow-wrap: anywhere; }
+.book-card p { font-size: 17px; }
+.book-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.book-tags span { background: #edf3e7; border-radius: 6px; padding: 3px 8px; font-size: 13px; }
+.book-card details { margin-top: 15px; color: #6b7b62; font-size: 14px; }
+.book-card a { color: #355f47; }
+.book-delete { margin-top: 20px; font-size: 14px; color: #927568; }
+.book-editor { max-width: 650px; margin: 24px auto; padding: 25px; background: #fff; border-radius: 16px; }
+.book-empty { padding: 60px 30px; background: #fff; border-radius: 16px; text-align: center; color: #72806a; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #91af83; outline-offset: 2px; }

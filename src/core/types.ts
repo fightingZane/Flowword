@@ -23,6 +23,13 @@ export interface SubtitleSnapshot {
 export interface SentenceContext extends SubtitleSnapshot {
   text: string;
   isPartial: boolean;   // 无句末标点时只声明捕获到字幕片段
+  learning?: {
+    status: 'disabled' | 'loading' | 'ready' | 'error';
+    translation?: string;
+    segmented?: boolean;
+    error?: string;
+    candidates: (VocabularyCandidate & { translation?: string })[];
+  };
 }
 
 export interface InteractionState {
@@ -44,6 +51,31 @@ export interface Settings {
   enabled: boolean;
   position: BallPosition;
   offset: number;
+  appearance: Appearance;
+  onlineTranslation: boolean;
+}
+
+export interface Appearance {
+  fontSize: number;
+  panelTheme: 'auto' | 'light' | 'dark' | 'warm' | 'blue';
+  ballColor: string;
+  ballStyle: 'glass' | 'solid' | 'outline';
+  ballOpacity: number;
+  panelWidth: number;
+}
+
+export interface WordbookEntry {
+  id: string;
+  kind: 'word' | 'phrase' | 'sentence';
+  text: string;
+  lemma?: string;
+  translation: string;
+  partOfSpeech: string;
+  examTags: string[];
+  tags: string[];
+  createdAt: number;
+  updatedAt: number;
+  contexts: { sentence: string; url: string; time: number }[];
 }
 
 // 播放接口仅操作适配器选中的主视频，测试可以替换接口验证竞态
@@ -74,3 +106,4 @@ export interface PageStatus {
   phase: Phase;
   version: string;
 }
+import type { VocabularyCandidate } from './vocabulary';
