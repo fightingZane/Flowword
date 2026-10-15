@@ -18,6 +18,7 @@ interface ReplaySession {
   ownPlay: boolean;
   started: boolean;
   onFinished?: () => void;
+  boundary?: () => boolean;
 }
 
 export class ReplayController {
@@ -28,17 +29,17 @@ export class ReplayController {
   get active(): boolean { return this.session !== null; }
 
   // repeat 意为重听一次，video 是主视频，range 是真实或已观测时间范围
-  // isCurrent 复核页面与视频身份，onFinished 在句末主动暂停后通知归属控制器
+  // isCurrent 复核视频身份，onFinished 通知暂停归属，boundary 可选回调只供 DOM 实时确认字幕转换
   // 调用会替换旧会话并立即跳到句首，Promise 只等待开始播放，不等待整段结束
-  async repeat(video: ReplayVideo, range: ReplayRange, isCurrent: () => boolean, onFinished?: () => void): Promise<void> {
+  async repeat(video: ReplayVideo, range: ReplayRange, isCurrent: () => boolean, onFinished?: () => void, boundary?: () => boolean): Promise<void> {
     this.cancel();
     if (!video.isConnected || !isCurrent()) throw new Error('视频已切换，请重新捕获后重听');
     if (!Number.isFinite(video.duration) || !Number.isFinite(range.start) || !Number.isFinite(range.end)
-      || range.start < 0 || range.end - range.start < 0.08 || range.start >= video.duration) {
+      || range.start < 0 || (!boundary && range.end - range.start < 0.08) || range.start >= video.duration) {
       throw new Error('还没有足够的字幕时间范围，先播放这段字幕后再重听');
     }
     const session: ReplaySession = { video, source: video.currentSrc, range: { start: range.start, end: Math.min(range.end, video.duration) },
-      isCurrent, ownSeek: true, ownPlay: video.paused, started: false, onFinished };
+      isCurrent, ownSeek: true, ownPlay: video.paused, started: false, onFinished, boundary };
     this.session = session;
     for (const name of ['seeking', 'seeked', 'play', 'pause', 'ended', 'emptied', 'loadstart']) video.addEventListener(name, this.mediaEvent);
     this.timer = setInterval(this.check, 30);
@@ -85,13 +86,13 @@ export class ReplayController {
   };
 
   // check 意为按媒体时间检查句末，无参数，由本会话短周期计时器调用
-  // 缓冲不推进 currentTime 时继续等待，来源变化则取消，绝不按墙钟估算片段结束
+  // 原生轨道检查媒体时间，DOM 只检查实时字幕转换，来源变化取消，不把点击时刻当成句末
   private check = (): void => {
     const session = this.session;
     if (!session) return;
     const video = session.video;
     if (!video.isConnected || !session.isCurrent() || video.currentSrc !== session.source) { this.cancel(); return; }
-    if (session.started && video.currentTime >= session.range.end) {
+    if (session.started && (session.boundary ? session.boundary() : video.currentTime >= session.range.end)) {
       this.cancel();
       video.pause();
       session.onFinished?.();

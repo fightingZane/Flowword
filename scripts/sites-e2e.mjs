@@ -217,6 +217,7 @@ try {
   await seek(3, true); await page.waitForTimeout(2300);
   assert.equal(await run.worker.evaluate(() => globalThis.fixtureCloudRequests.length), 0);
   log('云端已配置但预译未启用时，播放字幕零网络请求');
+  await seek(3);   // 先停在目标字幕，再启用预译，避免旧进度抢先请求并占用两秒节流窗口
   await extension.getByRole('checkbox', { name: /允许播放中预译/ }).check(); await extension.getByRole('button', { name: '授权接口并保存' }).click();
   await extension.getByText('配置已保存', { exact: false }).waitFor();
   await page.bringToFront();   // 模拟用户从配置页回到视频，避免后台标签定时器节流错过短字幕

@@ -67,7 +67,8 @@ function cueSegments(selected: TextTrack | undefined, activeOnly = false): Subti
   return segments.sort((a, b) => a.start - b.start);
 }
 
-function visibleCaption(): string {
+// readVisibleYouTubeCaption 读取当前可见字幕文本，无参数，仅观察真实 DOM，不返回缓存或补造下一句
+export function readVisibleYouTubeCaption(): string {
   const nodes = Array.from(document.querySelectorAll<HTMLElement>(YOUTUBE.captions));
   return normalizeText(nodes.filter((node) => node.getClientRects().length > 0).map((node) => node.textContent).join(' '));
 }
@@ -109,7 +110,7 @@ export class YouTubeSubtitleAdapter implements SubtitlePort {
     if (source !== this.source) this.cache.clear();   // 切换或关闭字幕轨道后不沿用旧来源
     this.source = source;
     const cue = cueSegments(track, true).findLast((segment) => segment.start <= time && segment.end >= time);
-    const text = track ? '' : visibleCaption();
+    const text = track ? '' : readVisibleYouTubeCaption();
     this.cache.observe(cue ? { ...cue, end: Math.min(cue.end, time) } : readableLatin(text)
       ? { text, start: time, end: time, source: 'youtube-dom', language: 'und' } : null, time);
     // 缓存只记录已经观测的区间，不把轨道中的未来结束时间当成可回退字幕

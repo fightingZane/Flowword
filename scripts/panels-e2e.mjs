@@ -86,6 +86,7 @@ try {
   const before = page.getByRole('button', { name: '上文：Earlier observations were surprising.' }); const after = page.getByRole('button', { name: '下文：The next explanation follows.' });
   await before.waitFor(); await after.waitFor();
   const positions = await Promise.all([before.boundingBox(), page.locator('.fw-sentence').boundingBox(), after.boundingBox()]); assert.ok(positions[0].y < positions[1].y && positions[1].y < positions[2].y);
+  assert.ok(positions[1].y - positions[0].y - positions[0].height <= 14, '上文与当前句应保持紧凑间距');
   assert.equal(await page.locator('.fw-neighbor-translation').count(), 0); assert.equal((await page.locator('.fw-neighbor').allTextContents()).join('').includes('暂无'), false);
   assert.equal((await run.worker.evaluate(() => globalThis.panelRequests)).includes('Earlier observations were surprising.'), false);
   await before.click(); await page.locator('.fw-neighbor-translation').filter({ hasText: '测试中文译文' }).waitFor();

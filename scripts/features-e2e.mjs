@@ -91,8 +91,17 @@ try {
     const style = getComputedStyle(element);
     return { width: style.scrollbarWidth, color: style.scrollbarColor, paper: style.backgroundColor };
   });
-  assert.equal(scroll.width, 'thin');
-  assert.notEqual(scroll.color, 'auto');
+  assert.equal(scroll.width, 'none');
+  const scrollRail = page.getByRole('scrollbar', { name: '面板滚动条' });
+  await scrollRail.focus(); await page.keyboard.press('End');
+  assert.ok(await page.locator('.fw-body').evaluate((element) => element.scrollTop) > 0);
+  await page.keyboard.press('Home');
+  assert.equal(await page.locator('.fw-body').evaluate((element) => element.scrollTop), 0);
+  const thumbBox = await page.locator('.fw-scrollbar-thumb').boundingBox();
+  await page.mouse.move(thumbBox.x + 2, thumbBox.y + 5); await page.mouse.down();
+  await page.mouse.move(thumbBox.x + 2, thumbBox.y + 70, { steps: 8 }); await page.mouse.up();
+  assert.ok(await page.locator('.fw-body').evaluate((element) => element.scrollTop) > 0);
+  await scrollRail.focus(); await page.keyboard.press('Home');
   log('右键只配置不暂停，字体主题颜色和风格实时生效');
 
   const referenceSettings = await run.context.newPage();

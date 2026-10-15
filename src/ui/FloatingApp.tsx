@@ -4,6 +4,7 @@ import type { InteractionController } from '../core/interaction-controller';
 import type { Appearance, BallPosition, Point, Settings, WordbookEntry } from '../core/types';
 import { browser } from 'wxt/browser';
 import { QuickWordbook } from './QuickWordbook';
+import { ScrollArea } from './ScrollArea';
 import { NeighborLine } from './NeighborLine';
 import './quick-wordbook.css';
 import { SettingsPanel } from './SettingsPanel';
@@ -274,7 +275,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
         <button type="button" data-close className="fw-icon-button" aria-label="关闭面板，保持视频暂停" title="关闭面板 · 保持暂停" onClick={close}><Icon name="close" size={16} /></button>
       </header>
 
-      <div className="fw-body" aria-live="polite" aria-busy={busy}>
+      <ScrollArea busy={busy}>
         {secondaryView === 'provider' ? <iframe className="fw-provider-frame" src={browser.runtime.getURL('/settings.html') + '?embedded=1'} title="模型与快捷键设置" /> : secondaryView === 'book' ? <QuickWordbook onOpenFull={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })} /> : settingsOpen ? <SettingsPanel onProvider={() => { setSettingsOpen(false); setSecondaryView('provider'); }} settings={settings} onAppearance={onAppearance} onError={flash} onOnline={async (value) => {
           await onOnlineTranslation(value);
           if (state.context) void controller.capture(settings.offset);
@@ -354,7 +355,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
         </div>}
         {notice && <p className="fw-notice" role="status">{notice}</p>}
         </>}
-      </div>
+      </ScrollArea>
       <button type="button" className="fw-resize" aria-label="拖动调整翻译框大小" title="拖动调整宽高" onPointerDown={(event) => {
         if (event.button !== 0) return;
         panelGesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, width: panelWidth, height: displayHeight, point: panelPoint, resize: true };

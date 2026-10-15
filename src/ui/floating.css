@@ -41,24 +41,16 @@
 .fw-ball:hover .fw-tooltip, .fw-ball:focus-visible .fw-tooltip { opacity: 1; }
 .fw-bubble { position: fixed; z-index: 2147483647; overflow-y: auto; border: 1px solid #ffffff80; border-radius: 20px; background: var(--fw-paper); box-shadow: var(--fw-shadow); }
 .fw-bubble { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-.fw-body {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--fw-muted) 48%, var(--fw-paper)) var(--fw-paper);
-  scrollbar-gutter: stable;
-}
-.fw-body::-webkit-scrollbar { width: 8px; height: 8px; }
-.fw-body::-webkit-scrollbar-track { background: var(--fw-paper); }
-.fw-body::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--fw-muted) 48%, var(--fw-paper));
-  border: 2px solid var(--fw-paper);
-  border-radius: 999px;
-}
-.fw-body::-webkit-scrollbar-thumb:hover { background: var(--fw-muted); }
-.fw-body::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-@media (forced-colors: active) { .fw-body { scrollbar-color: auto; } }
+/* 原生轨道彻底隐藏，滑动行为保留，由主题轨道提供拖动和键盘控制 */
+.fw-scroll-area { position: relative; display: flex; flex: 1; min-height: 0; }
+.fw-scroll-area > .fw-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none !important; scrollbar-color: auto; }
+.fw-scroll-area > .fw-body::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+.fw-scrollbar { position: absolute; top: 8px; bottom: 8px; right: 5px; width: 9px; border-radius: 999px; background: color-mix(in srgb, var(--fw-muted) 9%, var(--fw-paper)); touch-action: none; z-index: 4; cursor: pointer; }
+.fw-scrollbar[data-visible="false"] { visibility: hidden; pointer-events: none; }
+.fw-scrollbar-thumb { width: 5px; margin: 0 2px; border-radius: 999px; background: color-mix(in srgb, var(--fw-muted) 48%, var(--fw-paper)); }
+.fw-scrollbar:hover .fw-scrollbar-thumb, .fw-scrollbar:focus-visible .fw-scrollbar-thumb { background: var(--fw-muted); }
+.fw-scrollbar:focus-visible { outline: 2px solid var(--fw-green); outline-offset: 1px; }
+@media (forced-colors: active) { .fw-scrollbar { background: Canvas; border: 1px solid CanvasText; } .fw-scrollbar-thumb { background: CanvasText; margin-left: 1px; } }
 .fw-header, .fw-footer { flex-shrink: 0; }
 .fw-header { cursor: move; touch-action: none; }
 .fw-resize { position: absolute; right: 2px; bottom: 1px; width: 20px; height: 20px; padding: 0; z-index: 5; cursor: nwse-resize !important; touch-action: none; background: transparent; color: var(--fw-muted) !important; }
@@ -182,3 +174,46 @@
 .fw-save-actions { display: flex; justify-content: space-between; gap: 12px; margin: 20px 0 6px; }
 .fw-app:not([data-theme="auto"]) .fw-tools button, .fw-app:not([data-theme="auto"]) .fw-retry { color: var(--fw-ink) !important; }
 .fw-app:not([data-theme="auto"]) .fw-mini-mark { color: var(--fw-green); }
+
+/* 收紧字幕层次与操作节奏，尺寸继续由用户字号和面板宽高独立控制 */
+.fw-header { gap: 7px; flex-wrap: wrap; padding: 12px 16px; }
+.fw-brand { flex: 1 1 auto; min-width: 0; gap: 6px; line-height: 1.4; }
+.fw-brand-caption { white-space: nowrap; }
+.fw-header-config { margin-left: 0; padding: 5px 8px; border-radius: 7px; background: var(--fw-wash); color: var(--fw-ink) !important; line-height: 1.4; white-space: nowrap; }
+.fw-header-config:hover { background: color-mix(in srgb, var(--fw-line) 70%, var(--fw-wash)); }
+.fw-icon-button { flex: 0 0 30px; width: 30px; height: 30px; border-radius: 7px; }
+.fw-eyebrow { gap: 6px; line-height: 1.4; margin-bottom: 8px; }
+.fw-time { letter-spacing: .3px; }
+.fw-sentence { font-size: calc(var(--fw-font) * 1.55); line-height: 1.38; letter-spacing: -.15px; margin: 8px 0 9px; }
+.fw-neighbor { opacity: 1; font-size: calc(var(--fw-font) * .8); line-height: 1.45; margin: 4px 0; }
+.fw-neighbor-toggle { padding: 3px 0; line-height: 1.45; border-radius: 4px; }
+.fw-neighbor p { margin: 3px 0 2px; line-height: 1.5; }
+.fw-neighbor + .fw-sentence { margin-top: 5px; }
+.fw-current-translation { margin: 0 0 7px; }
+.fw-current-translation .fw-translation { font-size: calc(var(--fw-font) * 1.15); line-height: 1.6; margin: 0 0 5px; }
+.fw-current-translation .fw-translation-label { gap: 5px; line-height: 1.4; font-weight: 400; }
+.fw-current-translation + .fw-neighbor { margin-top: 3px; }
+.fw-current-actions { gap: 7px 9px; margin-top: 8px; padding: 9px 0; border-top: 1px solid var(--fw-line); border-bottom: 1px solid var(--fw-line); }
+.fw-current-actions button:not(.fw-primary) { padding: 6px 8px; border-radius: 7px; background: var(--fw-wash); line-height: 1.4; }
+.fw-current-actions .fw-primary { padding: 7px 10px; border-radius: 7px; gap: 6px; }
+.fw-learning { margin: 13px 0; padding-top: 11px; }
+.fw-current-actions + .fw-learning { border-top: 0; margin-top: 0; }
+.fw-learning-title { gap: 5px 8px; line-height: 1.5; }
+.fw-learning-note { margin: 7px 0; line-height: 1.6; }
+.fw-context-note { margin: 6px 0; line-height: 1.6; }
+.fw-context-note button { background: var(--fw-wash); color: var(--fw-ink); border-radius: 6px; padding: 4px 7px; font: inherit; }
+.fw-candidate { padding: 11px 0; }
+.fw-candidate-title { gap: 6px; line-height: 1.45; }
+.fw-candidate-title strong { font-size: calc(var(--fw-font) * 1.05); font-weight: 650; }
+.fw-candidate-title button { padding: 4px 8px; line-height: 1.4; }
+.fw-candidate > p { margin: 5px 0 3px; font-size: calc(var(--fw-font) * .95); line-height: 1.6; }
+.fw-candidate-reason { margin-left: 0; line-height: 1.5; }
+.fw-tools { gap: 7px 12px; padding: 11px 0 12px; }
+.fw-tools button { line-height: 1.5; padding: 3px 0; }
+.fw-offset { margin-top: 12px; gap: 6px; line-height: 1.5; }
+.fw-offset select { padding: 5px 7px; }
+.fw-footer { gap: 8px; padding: 11px 16px; border-top: 1px solid var(--fw-line); }
+.fw-footer > span { flex: 1 1 130px; line-height: 1.5; }
+.fw-footer .fw-primary { padding: 8px 12px; border-radius: 8px; gap: 7px; }
+.fw-footer .fw-retry { padding: 6px 0; line-height: 1.5; }
+@media (max-width: 420px) { .fw-header { padding: 11px 13px; gap: 6px; } .fw-header-config { padding: 5px 6px; } .fw-footer { padding: 10px 13px; } }

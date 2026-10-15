@@ -26,3 +26,8 @@ InteractionController以操作编号与AbortSignal阻止过期结果；enrich并
 内容脚本面板只获得公开服务信息，设置iframe不使用postMessage传Key
 Popup用FLOWWORD_PANEL_OPEN通知当前已授权视频的内容脚本切换面板，快捷词本只有完整入口创建网页
 NeighborLine在当前拼句范围外筛真实邻句，展开才查询，卸载忽略旧结果
+
+## 0.5.1滚动与DOM重听
+ScrollArea保留原生内容滚动但隐藏原生轨道，ResizeObserver/MutationObserver同步自绘滑块，指针和键盘映射scrollTop
+ReplayController可选boundary实时确认DOM目标字幕进入后转换，不依赖已观测end或跳回后清理的字幕缓存
+原生轨道保持cue.end，DOM实时读可见字幕，外部跳转/换源/暂停按旧归属规则取消

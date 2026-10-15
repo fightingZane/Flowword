@@ -2,9 +2,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { browser, type Browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { createShadowRootUi } from 'wxt/utils/content-script-ui/shadow-root';
-import { YouTubeSubtitleAdapter, YouTubeVideoController, videoKey } from '../src/adapters/youtube';
+import { YouTubeSubtitleAdapter, YouTubeVideoController, videoKey, readVisibleYouTubeCaption } from '../src/adapters/youtube';
 import { GenericSubtitleAdapter, GenericVideoController } from '../src/adapters/generic';
-import { latestObservedRange, prefetchItems, readTrackSegments, selectEnglishTrack, subtitleTimeline, type PrefetchItem } from '../src/adapters/html5-subtitles';
+import { createDomReplayBoundary, latestObservedRange, prefetchItems, readTrackSegments, selectEnglishTrack, subtitleTimeline, type PrefetchItem } from '../src/adapters/html5-subtitles';
 import { InteractionController } from '../src/core/interaction-controller';
 import { ReplayController } from '../src/core/replay-controller';
 import { assembleSentence } from '../src/core/sentence';
@@ -85,7 +85,7 @@ export default defineContentScript({
     }   // 内容脚本只接收公开模式和开关，接口地址与密钥始终留在扩展页面和后台
 
     // repeatSentence 意为重听当前原句，无参数，面板按钮和浏览器快捷键共用
-    // 没有面板时即时读取真实字幕，DOM 先补齐已经观测的终点，网络不参与重听
+    // 原生轨道按真实 cue 结束，DOM 回放中观察目标字幕切换，点击时刻不作为终点
     async function repeatSentence() {
       const context = controller.getSnapshot().context;
       const snapshot = context ?? subtitlePort.capture(videos.capture(), settings.offset);
@@ -96,7 +96,8 @@ export default defineContentScript({
       const source = video.currentSrc;
       subtitles.sample();
       await replay.repeat(video, latestObservedRange(snapshot, subtitles.cache.all()), () => videos.current() === video && pageKey() === key && video.currentSrc === source,
-        () => { try { controller.adoptReplayPause(); } catch { controller.reset(); } });
+        () => { try { controller.adoptReplayPause(); } catch { controller.reset(); } },
+        snapshot.selected.source === 'youtube-dom' ? createDomReplayBoundary(snapshot, readVisibleYouTubeCaption, () => video.currentTime) : undefined);
       if (context && replay.active) controller.rebaseHandle();   // 句末暂停属于用户主动要求的重听，新归属允许显式继续
     }
 

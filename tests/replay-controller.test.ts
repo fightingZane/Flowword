@@ -77,3 +77,19 @@ describe('明确的单次字幕重听会话', () => {
     expect(controller.active).toBe(false);
   });
 });
+
+it('DOM重听忽略点击终点，只在实时目标字幕转换后暂停', async () => {
+  const controller = new ReplayController(); const video = new TestVideo(); let changed = false;
+  await controller.repeat(video, { start: 2, end: 2.2 }, () => true, undefined, () => changed);
+  video.advance(4); vi.advanceTimersByTime(60);
+  expect(video.pause).not.toHaveBeenCalled(); expect(controller.active).toBe(true);
+  changed = true; vi.advanceTimersByTime(30);
+  expect(video.pause).toHaveBeenCalledOnce(); expect(controller.active).toBe(false);
+});
+
+it('DOM首次观测的零长度片段也允许等待真实转换，外部seek仍取消', async () => {
+  const controller = new ReplayController(); const video = new TestVideo();
+  await controller.repeat(video, { start: 2, end: 2 }, () => true, undefined, () => false);
+  video.currentTime = 9;
+  expect(controller.active).toBe(false); vi.advanceTimersByTime(1000); expect(video.pause).not.toHaveBeenCalled();
+});

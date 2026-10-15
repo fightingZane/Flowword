@@ -91,3 +91,26 @@ export function prefetchItems(snapshot: SubtitleSnapshot): PrefetchItem[] {
     return { sentence, context: subtitleTimeline(future).filter((item) => item.text !== sentence).slice(0, 2).map((item) => item.text) };
   });
 }   // 每个预译请求使用该句自己的稳定邻句，避免缓存因上下文不同而失配
+
+// createDomReplayBoundary 创建实时字幕结束探测器，snapshot 是被重听原句，两个读取函数仅观察当前 DOM 和媒体时间
+// 先进入目标字幕再等待消失或切换，滚动累加保留为同片段，不能据此保证自动字幕的完整语义句末
+export function createDomReplayBoundary(snapshot: SubtitleSnapshot, readCaption: () => string, readTime: () => number): () => boolean {
+  const target = normalizeText(snapshot.selected.text);
+  let entered = false;
+  let previous = target;
+  return () => {
+    if (readTime() < snapshot.selected.start - 0.1) return false;
+    const current = normalizeText(readCaption());
+    if (!entered) {
+      if (current && (current === target || current.includes(target) || target.includes(current))) { entered = true; previous = current; }
+      return false;
+    }
+    if (current === previous) return false;
+    if (!current || /[.!?]["'”’)]?$/.test(previous)) return true;
+    const oldWords = previous.toLowerCase().split(/\s+/);
+    const newWords = current.toLowerCase().split(/\s+/);
+    const rolling = current.includes(previous) || previous.includes(current) || oldWords.slice(-2).join(' ') === newWords.slice(0, 2).join(' ');
+    if (rolling) { previous = current; return false; }
+    return true;
+  };
+}
