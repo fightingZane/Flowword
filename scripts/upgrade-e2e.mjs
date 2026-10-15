@@ -36,6 +36,7 @@ try {
   await settings.getByLabel('HTTPS 接口完整地址').fill('https://api.mymemory.translated.net/v1/chat/completions');
   await settings.getByLabel('模型名称').fill('flowword-test-model'); await settings.getByLabel('API Key').fill('TEST-ONLY-DUMMY-KEY');
   await settings.getByRole('button', { name: '授权接口并保存' }).click(); await settings.getByText('配置已保存', { exact: false }).waitFor();
+  await settings.getByText('当前实际服务：云端模型 · flowword-test-model', { exact: true }).waitFor();
   await run.worker.evaluate(() => {
     globalThis.cloudRequests = [];
     globalThis.fetch = async (_url, options) => {

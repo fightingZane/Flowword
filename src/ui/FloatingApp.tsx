@@ -7,6 +7,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { SaveEntryForm } from './SaveEntryForm';
 import { FlowMark, Icon } from './Icons';
 import { getCuratedMeaning, GENERAL_MEANING_NOTE } from '../core/curated-meanings';
+import { entryKey, hasMeaning, hasSourceSpan } from '../core/learning-view';
 import { observedSentenceRange } from '../adapters/html5-subtitles';
 
 interface Props {
@@ -46,12 +47,10 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   const panelGesture = useRef<{ id: number; x: number; y: number; width: number; height: number; point: Point; resize: boolean } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draft, setDraft] = useState<WordbookEntry | null>(null);
+  const [savedEntries, setSavedEntries] = useState<WordbookEntry[]>([]);
+  const savedRevision = useRef(0);
   const [expanded, setExpanded] = useState(false);
-  const [extraMeanings, setExtraMeanings] = useState<Record<string, string>>({});
-  const [lookingUp, setLookingUp] = useState('');
   const contextKey = `${state.context?.videoKey}:${state.context?.capturedTime}:${state.context?.text}`;
-  const currentContext = useRef(contextKey);
-  currentContext.current = contextKey;
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
   const drag = useRef<{ id: number; origin: Point; startPoint: Point; point: Point; moved: boolean } | null>(null);
@@ -69,7 +68,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
     setPoint(restorePosition(settings.position, viewport()));
   }, [settings.position.x, settings.position.y]);
 
-  useEffect(() => { setExtraMeanings({}); setLookingUp(''); setExpanded(false); setDraft(null); }, [contextKey]);
+  useEffect(() => { setExpanded(false); setDraft(null); }, [contextKey]);
 
   useEffect(() => {
     const resize = () => {
@@ -106,13 +105,13 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   }
 
   // finishDrag 结束球拖动，event提供指针身份，cancelled表示浏览器取消操作
-  // 只处理本次指针并保存贴边位置，拖动结束不能误触发暂停点击
+  // 只处理本次指针并按配置保存自由位置或贴边位置，拖动结束不能误触发暂停点击
   function finishDrag(event: React.PointerEvent<HTMLButtonElement>, cancelled = false) {
     const active = drag.current;
     if (!active || active.id !== event.pointerId) return;
     suppressClick.current = active.moved || cancelled;
     if (active.moved) {
-      const final = snapToEdge(active.point, viewport());
+      const final = settings.appearance.ballPlacement === 'edge' ? snapToEdge(active.point, viewport()) : constrain(active.point, viewport());
       setPoint(final);
       void onPosition(rememberPosition(final, viewport())).catch(() => flash('位置没有保存成功，请重新拖动'));
     }
@@ -144,24 +143,34 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   async function save(entry: WordbookEntry) {
     const response = await browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_SAVE', entry });
     if (!response?.ok) throw new Error(response?.error || '保存失败');
+    savedRevision.current += 1;   // 保存确认使更早发出的收藏列表失效
+    setSavedEntries((previous) => [...previous.filter((item) => item.id !== response.entry.id), response.entry]);
     setDraft(null); flash('已加入本地单词本');
   }
 
-  // lookup 查询lemma在当前原句中的语境义，需云端模型，不把独立词典义冒充语境义
-  // 换句后忽略旧回复，并回收查询按钮状态
-  async function lookup(lemma: string) {
-    const key = contextKey;
-    setLookingUp(lemma);
-    try {
-      const response = await browser.runtime.sendMessage({ type: 'FLOWWORD_CONTEXT', sentence: state.context?.text, context: [], focus: lemma });
-      if (currentContext.current !== key) return;
-      if (response?.contextUnavailable) throw new Error('语境释义需要在独立设置页配置云端模型');
-      const expression = response?.expressions?.find((item: { text: string }) => item.text.toLowerCase() === lemma.toLowerCase());
-      if (!expression?.meaning) throw new Error(response?.error || '当前模型未返回该词的语境义');
-      setExtraMeanings((previous) => ({ ...previous, [lemma]: expression.meaning }));
-    } catch (error) { if (currentContext.current === key) flash(error instanceof Error ? error.message : '查询失败'); }
-    finally { if (currentContext.current === key) setLookingUp(''); }
+  // saved 判断kind类型与原文或lemma是否已收藏，允许再次点击保存当前视频的新语境
+  function saved(kind: WordbookEntry['kind'], text: string, lemma = text): boolean {
+    const keys = [entryKey(kind, text), entryKey(kind, lemma)];
+    return savedEntries.some((entry) => keys.includes(entryKey(entry.kind, entry.text)) || keys.includes(entryKey(entry.kind, entry.lemma || entry.text)));
   }
+
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    // refresh 读取后台确认的收藏记录，无参数，打开面板或切回网页时同步删除与新增
+    const refresh = () => {
+      const revision = ++savedRevision.current;
+      void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_LIST' }).then((response) => {
+        if (active && revision === savedRevision.current && response?.ok && Array.isArray(response.entries)) setSavedEntries(response.entries);
+      }).catch(() => {});
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => { active = false; window.removeEventListener('focus', refresh); };
+  }, [visible]);
+
+  const expressions = state.context?.learning?.expressions?.filter((item) => hasMeaning(item.meaning) && hasSourceSpan(state.context!.text, item.text)) ?? [];
+  const candidates = state.context?.learning?.candidates.filter((item) => hasMeaning(item.translation || item.meaning) && hasSourceSpan(state.context!.text, item.text)) ?? [];
 
   const appearanceStyle = { '--fw-font': `${settings.appearance.fontSize}px`, '--fw-ball-color': settings.appearance.ballColor,
     '--fw-ball-opacity': settings.appearance.ballOpacity / 100 } as React.CSSProperties;
@@ -278,8 +287,9 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
               : <p className="fw-learning-note" role="status">{state.context.learning.error || '暂没有可用译文'}</p>}
             <div className="fw-translation-label">当前句译文 <span>{state.context.learning.provider || '参考翻译'}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
           </div>}
+          {state.context.learning?.provider === 'mymemory' && <p className="fw-context-note">MyMemory 参考机译 · 无语境分析 <button type="button" onClick={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_SETTINGS_OPEN' })}>配置语境模型 ↗</button></p>}
           <div className="fw-current-actions">
-            <button type="button" className="fw-primary" onClick={() => add(state.context!.text, 'sentence', state.context!.learning?.translation || '', state.context!.text, '句子')}>收藏整句</button>
+            <button type="button" className="fw-primary" onClick={() => add(state.context!.text, 'sentence', state.context!.learning?.translation || '', state.context!.text, '句子')}>{saved('sentence', state.context.text) ? '已加入整句' : '收藏整句'}</button>
             {onRepeat && <button type="button" className="fw-retry" onClick={() => void onRepeat().catch((error) => flash(error instanceof Error ? error.message : '无法重听'))}>重听这一句 ↻</button>}
             {onFollow && <button type="button" className="fw-retry" onClick={() => void onFollow().catch((error) => flash(error instanceof Error ? error.message : '无法跟随'))}>字幕跟随 ▷</button>}
           </div>
@@ -287,29 +297,28 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
             {state.context.learning.timeline?.filter((line) => line.end <= state.context!.selected.start).slice(-1).map((line) => <div className="fw-neighbor" key={line.start}><p>{line.text}</p><p>{line.translation || '上下文译文尚未准备'}</p></div>)}
             {state.context.learning.timeline?.filter((line) => line.start >= state.context!.selected.end).slice(0, 1).map((line) => <div className="fw-neighbor" key={line.start}><p>{line.text}</p><p>{line.translation || '上下文译文尚未准备'}</p></div>)}
             <div className="fw-learning-title">优先看这些表达 <span>专业词 · 地道搭配 · 非概率</span></div>
-            {state.context.learning.expressions?.map((expression) => <div className="fw-candidate fw-context-expression" key={expression.text}>
-              <div className="fw-candidate-title"><strong>{expression.text}</strong><span className="fw-kind">{expression.partOfSpeech}</span><button type="button" onClick={() => add(expression.text, expression.kind, expression.meaning, expression.text, expression.partOfSpeech)}>加入</button></div>
+            {expressions.map((expression) => <div className="fw-candidate fw-context-expression" key={expression.text}>
+              <div className="fw-candidate-title"><strong>{expression.text}</strong><span className="fw-kind">{expression.partOfSpeech}</span><button type="button" onClick={() => add(expression.text, expression.kind, expression.meaning, expression.text, expression.partOfSpeech)} title="已收藏的表达仍可点击记录当前语境">{saved(expression.kind, expression.text) ? '已加入' : '加入'}</button></div>
               <p>{expression.meaning}</p><span className="fw-candidate-reason">{expression.reason}</span>
             </div>)}
             {state.context.learning.contextStatus === 'loading' && <p className="fw-learning-note">语境表达解析中…</p>}
             {state.context.learning.contextError && <p className="fw-learning-note">{state.context.learning.contextError}</p>}
             {state.context.learning.provider === 'cloud' && <p className="fw-context-note">根据当前句与邻近字幕解释，模型结果仍需结合原文核对</p>}
-            {state.context.learning.provider !== 'cloud' && !state.context.learning.expressions?.length && <>
+            {state.context.learning.provider !== 'cloud' && !expressions.length && <>
             <p className="fw-context-note">{GENERAL_MEANING_NOTE}</p>
-            {state.context.learning.candidates.length ? state.context.learning.candidates.slice(0, expanded ? 8 : 3).map((candidate, index) => {
-              const meaning = extraMeanings[candidate.lemma] || candidate.translation || candidate.meaning;
+            {candidates.length ? candidates.slice(0, expanded ? 8 : 3).map((candidate, index) => {
+              const meaning = candidate.translation || candidate.meaning;
               const curated = getCuratedMeaning(candidate.lemma);
               const parts: Record<string, string> = { noun: '名词', verb: '动词', adjective: '形容词', adverb: '副词', phrase: '短语' };
               return <div className="fw-candidate" key={candidate.lemma}>
                 <div className="fw-candidate-title"><span className="fw-rank">{index + 1}</span><strong lang="en">{candidate.text}</strong><span className="fw-kind">{candidate.kind === 'phrase' ? '短语' : '单词'}</span>
-                  <button type="button" aria-label={`加入单词本 ${candidate.text}`} onClick={() => add(candidate.text, candidate.kind, meaning || '', candidate.lemma, parts[candidate.partOfSpeech ?? ''] || '未分类')}>加入</button></div>
-                {curated && <p className="fw-context-note">本地核验通用义（中文自编） · <a href={curated.sourceUrl} target="_blank" rel="noreferrer">Cambridge 语义依据</a></p>}
-                <p>{meaning || (state.context!.learning!.status === 'loading' && index < 3 ? '参考释义查询中…' : '暂无参考释义')}
-                  {!meaning && settings.onlineTranslation && <button type="button" disabled={Boolean(lookingUp)} onClick={() => void lookup(candidate.lemma)}>{lookingUp === candidate.lemma ? '查询中' : '查参考义'}</button>}</p>
+                  <button type="button" aria-label={`加入单词本 ${candidate.text}`} onClick={() => add(candidate.text, candidate.kind, meaning || '', candidate.lemma, parts[candidate.partOfSpeech ?? ''] || '未分类')} title="已收藏的表达仍可点击记录当前语境">{saved(candidate.kind, candidate.text, candidate.lemma) ? '已加入' : '加入'}</button></div>
+                {curated && <p className="fw-context-note">本地核验通用义（中文自编） · <a href={curated.sourceUrl} target="_blank" rel="noreferrer">{curated.sourceName} 语义依据</a></p>}
+                <p>{meaning}</p>
                 <span className="fw-candidate-reason">{candidate.reason}</span>
               </div>;
-            }) : <p className="fw-learning-note">这段字幕没有筛选出需要优先提示的表达</p>}
-            {state.context.learning.candidates.length > 3 && <button type="button" className="fw-retry" onClick={() => setExpanded(!expanded)}>{expanded ? '收起更多' : '展开更多表达'}</button>}
+            }) : <p className="fw-learning-note">当前服务未提供可用表达释义，可配置语境模型</p>}
+            {candidates.length > 3 && <button type="button" className="fw-retry" onClick={() => setExpanded(!expanded)}>{expanded ? '收起更多' : '展开更多表达'}</button>}
             </>}
             {state.context.learning.translation && state.context.learning.error && <p className="fw-learning-note">{state.context.learning.error}</p>}
           </div>}

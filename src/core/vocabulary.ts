@@ -1,3 +1,4 @@
+import { TECH_MEANINGS } from './curated-meanings';
 export type VocabularyKind = 'word' | 'phrase';
 export type VocabularyPartOfSpeech = 'verb' | 'noun' | 'adjective' | 'adverb' | 'phrase' | 'unclassified';
 
@@ -36,7 +37,7 @@ const BASIC_WORDS = new Set((
   'up down into onto over under out off about around through across between among ' +
   'here there now before after again also too very more most less least much many ' +
   'one two three four five six seven eight nine ten first second last next other another ' +
-  'only even still just already always never often sometimes usually really almost quite ' +
+  'only even still just already always never often sometimes usually really almost quite actually useful ' +
   'both either neither own same different enough such rather ' +
   'go come get make take give find think know see look say tell ask use need want feel try ' +
   'work play help keep put let turn bring run set call move start stop begin end leave stay ' +
@@ -61,7 +62,7 @@ const BASIC_WORDS = new Set((
 // 人工分层只帮助初始排序，没有校准为词频、CEFR、四六级或用户陌生程度
 const WORD_PRIORITY: Record<string, number> = {
   telephoto: 95, semiconductor: 95, latency: 90, throughput: 92, refraction: 92,
-  'high-refresh': 88, 'refresh-rate': 88, benchmark: 87, firmware: 90,
+  'ultra-thin': 96, 'high-refresh': 88, 'refresh-rate': 88, benchmark: 87, firmware: 90,
   obscure: 82, underwhelming: 80, counterintuitive: 86, unprecedented: 84,
   meticulous: 85, ambiguous: 77, subtle: 70, constraint: 72, feasible: 72,
   redundant: 70, resilient: 78, intriguing: 78, pitfall: 76, underlying: 72,
@@ -80,6 +81,7 @@ const WORD_PRIORITY: Record<string, number> = {
 
 // 以下释义由项目自行撰写，保留多义提示，不声称已完成上下文词义消歧
 const PHRASE_DATA: Array<[string, string, number]> = [
+  ...TECH_MEANINGS.filter((entry) => entry.lemma.includes(' ')).map((entry): [string, string, number] => [entry.lemma, entry.meaning, 98]),
   ['telephoto lens', '长焦镜头；可在较远距离拍摄更紧的取景画面', 97],
   ['refresh rate', '刷新率；显示器每秒更新画面的次数', 93],
   ['high-refresh display', '高刷新率显示屏', 94],
@@ -179,6 +181,7 @@ const NAMES = new Set((
   'monday tuesday wednesday thursday friday saturday sunday'
 ).split(' '));
 
+// normalizeVocabularyWord 归一value实际词形，仅使用已知词表支持的变化，不机械截词尾
 export function normalizeVocabularyWord(value: string): string {
   const word = value.toLowerCase().replace(/’/g, "'").replace(/'s$/, '');
   if (PRESERVE_FORM.has(word)) return word;   // 这些词不能简单按末尾 s 当作复数
@@ -198,6 +201,7 @@ export function normalizeVocabularyWord(value: string): string {
   return possible.find((candidate) => KNOWN_BASES.has(candidate)) ?? word;   // 归一结果必须存在于明确词表
 }
 
+// isLikelyName 用token与sentence位置保守判断专名，可能的专名不加入普通生词候选
 function isLikelyName(token: Token, sentence: string): boolean {
   if (NAMES.has(token.lemma) || /[a-z][A-Z]|[A-Z]{2}/.test(token.text)) return true;
   if (!/^[A-Z]/.test(token.text)) return false;
@@ -206,10 +210,12 @@ function isLikelyName(token: Token, sentence: string): boolean {
   return !startsSentence || !KNOWN_BASES.has(token.lemma);   // 句首未知大写词保守跳过，不能可靠区分专名与普通词
 }
 
+// wordPriority 为lemma计算本地启发式优先级，返回值不是陌生概率或考试等级
 function wordPriority(lemma: string): number {
   return WORD_PRIORITY[lemma] ?? 44 + Math.min(12, Math.max(0, lemma.length - 5));   // 未列出的词只按粗略规则候选，不声称低频
 }
 
+// analyzeVocabulary 从sentence提取最多limit个原文候选，长表达优先匹配，未知词可能没有本地参考义
 export function analyzeVocabulary(sentence: string, limit = 8): VocabularyCandidate[] {
   if (typeof sentence !== 'string' || !sentence.trim()) return [];
   const maximum = Number.isFinite(limit) ? Math.max(0, Math.min(8, Math.floor(limit))) : 8;

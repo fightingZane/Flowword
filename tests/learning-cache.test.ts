@@ -15,7 +15,7 @@ describe('整句和语境双持久缓存', () => {
     expect(state.cloud).toHaveBeenCalledTimes(2);
   });
   it('损坏语境缓存不能作为有效结果展示', async () => {
-    const key = JSON.stringify(['context-v3-fast', 'zh-CN', 'thinking-disabled', state.config.mode, state.config.endpoint, state.config.model, 'context', 'standard', []]);
+    const key = JSON.stringify(['context-v4-quality', 'zh-CN', 'thinking-disabled', state.config.mode, state.config.endpoint, state.config.model, 'context', 'standard', []]);
     state.cache.set(key, '{"expressions":"838222"}');
     state.cloud.mockResolvedValue({ expressions: [] });
     expect(await learningRequest('standard', [], 'context')).toMatchObject({ expressions: [] });
@@ -39,4 +39,22 @@ it('实际后台请求器也拒绝未经独立授权的语境预解析', async (
     expect(await learningRequest('telephoto lens', [], 'context', 'prefetch')).toEqual({ skipped: true });
     expect(state.cloud).not.toHaveBeenCalled();
   } finally { state.config.prefetchExpressions = true; }
+});
+
+it('仅空白变化命中缓存，不合并不同语境或删除真实重复邻句', async () => {
+  state.cloud.mockResolvedValue({ expressions: [{ text: 'standard', meaning: '标准版型号', kind: 'word', partOfSpeech: '名词', reason: '型号表达' }] });
+  await learningRequest(' standard ', ['Phone\n review', 'Phone review'], 'context');
+  const before = state.cloud.mock.calls.length;
+  await learningRequest('standard', ['Phone review', 'Phone review'], 'context');
+  expect(state.cloud.mock.calls.length).toBe(before);
+  await learningRequest('standard', ['Phone review'], 'context');
+  expect(state.cloud.mock.calls.length).toBe(before + 1);
+  await learningRequest('standard', ['A laboratory reference standard.'], 'context');
+  expect(state.cloud.mock.calls.length).toBe(before + 2);
+});
+
+it('字形大小写与标点不被缓存规范化压平', async () => {
+  const { normalizeLearningInput } = await import('../src/services/learning-background');
+  expect(normalizeLearningInput('ｘ²  =  ４', ['A.', 'a.'])).toEqual({ sentence: 'ｘ² = ４', context: ['A.', 'a.'] });
+  expect(normalizeLearningInput('current', [' current ', 'current context'])).toEqual({ sentence: 'current', context: ['current context'] });
 });

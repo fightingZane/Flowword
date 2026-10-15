@@ -9,7 +9,7 @@ export const STORAGE = {
   onlineTranslation: 'flowword.onlineTranslation.v1',
 } as const;
 
-export const DEFAULT_APPEARANCE: Appearance = { fontSize: 16, panelTheme: 'auto', ballColor: '#355f47', ballStyle: 'glass', ballOpacity: 90, panelWidth: 460, panelHeight: 620 };
+export const DEFAULT_APPEARANCE: Appearance = { fontSize: 16, panelTheme: 'auto', ballColor: '#355f47', ballStyle: 'glass', ballPlacement: 'free', ballOpacity: 90, panelWidth: 460, panelHeight: 620 };
 export const DEFAULT_SETTINGS: Settings = { enabled: false, position: { x: 1, y: 0.62 }, offset: 0, appearance: DEFAULT_APPEARANCE, onlineTranslation: false };
 
 export function sanitizeAppearance(value: unknown): Appearance {
@@ -20,6 +20,7 @@ export function sanitizeAppearance(value: unknown): Appearance {
     panelTheme: ['auto', 'light', 'dark', 'warm', 'blue', 'forest', 'purple', 'sunset', 'rose', 'ink'].includes(input.panelTheme ?? '') ? input.panelTheme! : 'auto',
     ballColor: /^#[0-9a-f]{6}$/i.test(input.ballColor ?? '') ? input.ballColor! : '#355f47',
     ballStyle: ['glass', 'solid', 'outline'].includes(input.ballStyle ?? '') ? input.ballStyle! : 'glass',
+    ballPlacement: input.ballPlacement === 'edge' ? 'edge' : 'free',
     ballOpacity: number(input.ballOpacity, 40, 100, 90),
     panelWidth: number(input.panelWidth, 300, 1200, 460),
     panelHeight: number(input.panelHeight, 280, 1200, 620),

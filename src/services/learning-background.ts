@@ -25,16 +25,24 @@ export async function effectiveProvider(): Promise<ProviderConfig> {
   if (config) return { ...config, mode: stored[STORAGE.onlineTranslation] === true ? config.mode : 'off' };
   return { ...DEFAULT_PROVIDER, mode: stored[STORAGE.onlineTranslation] === true ? 'mymemory' : 'off' };
 }
+// normalizeLearningInput 规范原句与最多两句邻文本，仅合并空白并移除完整等于当前句的邻句，保留字形大小写标点及重复邻句顺序
+export function normalizeLearningInput(sentence: string, context: string[]): { sentence: string; context: string[] } {
+  const clean = (text: string) => text.replace(/\s+/g, ' ').trim();
+  const normalized = clean(sentence);
+  const nearby = context.filter((text) => typeof text === 'string').map(clean).filter((text) => text && text.length <= 2000 && text !== normalized);
+  return { sentence: normalized, context: nearby.slice(0, 2) };
+}
 // learningRequest 调度sentence和context的指定task，priority区分点击前台与可跳过的预译
 // 先复用缓存与相同请求，出队重新核对服务和授权，不能让预译占满前台通道
 export async function learningRequest(sentence: string, context: string[], task: 'translate' | 'context', priority: 'foreground' | 'prefetch' = 'foreground') {
   if (typeof sentence !== 'string' || !sentence.trim() || sentence.length > 6000) throw new Error('字幕文本无效或过长');
+  ({ sentence, context } = normalizeLearningInput(sentence, context));
   const config = await effectiveProvider();
   if (config.mode === 'off') throw new Error('请先在服务设置中启用翻译');
   if (config.mode === 'cloud' && !await browser.permissions.contains({ origins: [new URL(config.endpoint).origin + '/*'] })) throw new Error('请在服务设置中授权接口访问');
   if (priority === 'prefetch' && (!config.prefetch || (task === 'context' && config.prefetchExpressions !== true))) return { skipped: true };
   if (task === 'context' && config.mode !== 'cloud') return { provider: config.mode, expressions: [], contextUnavailable: true };
-  const key = JSON.stringify(['context-v3-fast', 'zh-CN', new URL(config.endpoint).hostname === 'api.deepseek.com' ? 'thinking-disabled' : 'provider-default', config.mode, config.endpoint, config.model, task, sentence, context]);
+  const key = JSON.stringify(['context-v4-quality', 'zh-CN', new URL(config.endpoint).hostname === 'api.deepseek.com' ? 'thinking-disabled' : 'provider-default', config.mode, config.endpoint, config.model, task, sentence, context]);
   const cached = await cachedTranslation(key);
   if (cached) {
     try {

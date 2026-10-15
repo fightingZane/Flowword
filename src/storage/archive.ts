@@ -5,6 +5,14 @@ export interface ArchiveVideo { id: string; url: string; title: string; updatedA
 export interface ArchiveCapture extends ArchiveContext { id: string; videoId: string }
 export interface ArchiveOccurrence { id: string; entryId: string; captureId: string; text: string; translation: string; createdAt: number }
 export interface ArchiveSnapshot { videos: ArchiveVideo[]; captures: ArchiveCapture[]; occurrences: ArchiveOccurrence[] }
+// videoDisplayMetadata 表示视频展示资料，从 video 的已保存来源推导站点和可选封面地址
+// 不会发起网络请求，thumbnail 只供用户主动点击加载后使用，其他网站显示本地占位
+export function videoDisplayMetadata(video: ArchiveVideo): { site: string; thumbnail?: string } {
+  const source = safeSourceUrl(video.url); if (!source) return { site: '未知来源' };
+  const url = new URL(source); const site = url.hostname.replace(/^www\./, '');
+  const id = /(^|\.)youtube\.com$/.test(url.hostname) ? url.searchParams.get('v') : url.hostname === 'youtu.be' ? url.pathname.slice(1) : undefined;
+  return { site, thumbnail: id && /^[a-zA-Z0-9_-]{6,20}$/.test(id) ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : undefined };
+}
 let database: Promise<IDBDatabase> | undefined;
 // open 表示打开归档库，作用是复用扩展来源的数据库连接
 // 无参数，只在扩展后台或扩展页面调用，失败后下次调用可以重试

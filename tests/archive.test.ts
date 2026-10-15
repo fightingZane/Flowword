@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { safeSourceUrl, videoIdentity, videoSourceLink } from '../src/storage/archive';
+import { safeSourceUrl, videoDisplayMetadata, videoIdentity, videoSourceLink } from '../src/storage/archive';
 import { validateEntry } from '../src/storage/wordbook';
 
 describe('学习视频来源与安全定位', () => {
+  it('封面只推导真实 YouTube 地址，不为其他站伪造封面', () => {
+    expect(videoDisplayMetadata({ id: 'youtube:abcdefghijk', url: 'https://www.youtube.com/watch?v=abcdefghijk', title: '课程', updatedAt: 1 })).toEqual({ site: 'youtube.com', thumbnail: 'https://i.ytimg.com/vi/abcdefghijk/mqdefault.jpg' });
+    expect(videoDisplayMetadata({ id: 'other', url: 'https://example.com/course', title: '课程', updatedAt: 1 })).toEqual({ site: 'example.com', thumbnail: undefined });
+  });
   it('接受普通 HTTP 和 HTTPS 视频来源', () => {
     expect(safeSourceUrl('https://example.com/course?id=7')).toBe('https://example.com/course?id=7');
     expect(safeSourceUrl('http://localhost:8000/video')).toBe('http://localhost:8000/video');

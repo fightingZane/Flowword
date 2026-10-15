@@ -50,7 +50,7 @@ try {
   const download = await downloadEvent; const path = await download.path(); const { readFile } = await import('node:fs/promises'); const backup = JSON.parse(await readFile(path, 'utf8'));
   assert.equal(backup.version, 2); assert.equal(backup.archive.occurrences.length, 11);
   await page.getByRole('button', { name: '删除条目' }).click();
-  await page.getByText('还没有条目。', { exact: false }).waitFor();
+  await page.getByText('还没有条目', { exact: false }).waitFor();
   await page.locator('input[type=file]').setInputFiles({ name: 'FlowWord-backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
   await page.getByText('Camera lesson · 0:00', { exact: true }).waitFor({ state: 'attached' });
   assert.equal(await page.locator('.book-source').count(), 11);

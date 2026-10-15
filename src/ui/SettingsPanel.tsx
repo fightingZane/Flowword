@@ -22,6 +22,10 @@ export function SettingsPanel({ settings, onAppearance, onOnline, onError }: Pro
     <label>翻译框主题<select value={appearance.panelTheme} onChange={(event) => update({ panelTheme: event.target.value as Appearance['panelTheme'] })}>
       {THEMES.map((theme) => <option key={theme.value} value={theme.value}>{theme.label}</option>)}
     </select></label>
+    <label>悬浮球定位<select value={appearance.ballPlacement ?? 'free'} onChange={(event) => update({ ballPlacement: event.target.value as 'free' | 'edge' })}>
+      <option value="free">自由放置</option><option value="edge">边缘吸附</option>
+    </select></label>
+    <p className="fw-context-note">拖动悬浮球可放在网页可视区域任意位置，位置自动保存</p>
     <label>悬浮球颜色<input type="color" value={appearance.ballColor} onChange={(event) => update({ ballColor: event.target.value })} /></label>
     <label>悬浮球风格<select value={appearance.ballStyle} onChange={(event) => update({ ballStyle: event.target.value as Appearance['ballStyle'] })}>
       <option value="glass">磨砂透明</option><option value="solid">纯色</option><option value="outline">线框</option>

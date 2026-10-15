@@ -66,6 +66,7 @@ export interface Appearance {
   panelTheme: Theme;
   ballColor: string;
   ballStyle: 'glass' | 'solid' | 'outline';
+  ballPlacement?: 'free' | 'edge';
   ballOpacity: number;
   panelWidth: number;
   panelHeight?: number;

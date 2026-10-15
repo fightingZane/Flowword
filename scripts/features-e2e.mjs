@@ -70,6 +70,16 @@ try {
   await page.getByRole('dialog', { name: 'FlowWord 配置框' }).waitFor();
   assert.equal(await pause(), false);
   await inputValue(page.getByLabel(/字体大小/), '20');
+  assert.equal(await page.getByLabel('悬浮球定位').inputValue(), 'free');
+  await page.getByLabel('悬浮球定位').selectOption('edge');
+  await page.waitForFunction(() => document.querySelector('flowword-ui')?.shadowRoot?.querySelector('select')?.closest('.fw-settings') !== null);
+  await page.waitForTimeout(150);
+  const ballBox = await ball().boundingBox();
+  await page.mouse.move(ballBox.x + 27, ballBox.y + 27);
+  await page.mouse.down(); await page.mouse.move(250, 320, { steps: 12 }); await page.mouse.up();
+  assert.equal(Math.round((await ball().boundingBox()).x), 14);
+  assert.equal(await pause(), false);
+  await page.getByLabel('悬浮球定位').selectOption('free');
   await page.waitForFunction(() => document.querySelector('flowword-ui')?.shadowRoot?.querySelector('.fw-app')?.style.getPropertyValue('--fw-font') === '20px');
   await page.getByLabel('翻译框主题').selectOption('blue');
   await inputValue(page.getByLabel('悬浮球颜色'), '#cc3344');
@@ -77,6 +87,12 @@ try {
   await page.waitForFunction(() => document.querySelector('flowword-ui')?.shadowRoot?.querySelector('[data-ball-style="outline"]'));
   assert.equal(await pause(), false);
   await page.screenshot({ path: resolve('test-results/configuration.png') });
+  const scroll = await page.locator('.fw-body').evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { width: style.scrollbarWidth, color: style.scrollbarColor, paper: style.backgroundColor };
+  });
+  assert.equal(scroll.width, 'thin');
+  assert.notEqual(scroll.color, 'auto');
   log('右键只配置不暂停，字体主题颜色和风格实时生效');
 
   const network = page.getByLabel('联网翻译总开关');
@@ -108,11 +124,15 @@ try {
   await page.getByLabel('自定义标签', { exact: true }).fill('技术英语，工作表达');
   await page.getByRole('button', { name: '保存到单词本' }).click();
   await page.waitForFunction(() => !document.querySelector('flowword-ui')?.shadowRoot?.querySelector('form'));
+  assert.equal(await page.getByRole('button', { name: '加入单词本 obscure', exact: true }).innerText(), '已加入');
   await page.getByRole('button', { name: '收藏整句', exact: true }).click();
   await page.getByLabel('听力理解', { exact: true }).check();
   await page.getByRole('button', { name: '保存到单词本' }).click();
   await page.waitForFunction(() => !document.querySelector('flowword-ui')?.shadowRoot?.querySelector('form'));
   log('从翻译框保存单词与语句，并设置词性、多个考点和自定义标签');
+  await page.reload(); await ball().waitFor(); await page.locator('#play').click(); await ball().click(); await ready();
+  await page.waitForFunction(() => document.querySelector('flowword-ui')?.shadowRoot?.querySelector('.fw-candidate button')?.textContent === '已加入' || Array.from(document.querySelector('flowword-ui')?.shadowRoot?.querySelectorAll('.fw-candidate button') ?? []).some((button) => button.textContent === '已加入'));
+  assert.equal(await page.getByRole('button', { name: '加入单词本 obscure', exact: true }).innerText(), '已加入');
 
   await book.bringToFront();
   await book.waitForFunction(() => document.querySelectorAll('.book-card').length === 2);
@@ -148,15 +168,15 @@ try {
   await run.worker.evaluate(() => { globalThis.translationDelay = 250; });
   await page.evaluate(() => window.testCaption('An ambiguous interpretation is unprecedented.'));
   await ball().click(); await ready();
-  await page.getByRole('button', { name: '查参考义', exact: true }).first().click();
+  assert.equal(await page.getByRole('button', { name: '查参考义', exact: true }).count(), 0);
   await page.getByRole('button', { name: '继续播放并关闭翻译框' }).click(); await idle();
   assert.equal(await pause(), false);
   await page.evaluate(() => window.testCaption('A resilient strategy sounds counterintuitive.'));
   await ball().click(); await ready();
-  await page.waitForFunction(() => Array.from(document.querySelector('flowword-ui')?.shadowRoot?.querySelectorAll('.fw-candidate button') ?? []).some((button) => button.textContent === '查参考义' && !button.disabled));
+  assert.doesNotMatch(await page.getByRole('dialog').innerText(), /暂无参考释义/);
   await page.waitForFunction(() => document.querySelector('flowword-ui')?.shadowRoot?.querySelector('.fw-translation')?.textContent.includes('resilient'));
   assert.doesNotMatch(await page.locator('flowword-ui .fw-translation').innerText(), /ambiguous/);
-  log('翻译和查义途中左键可继续，换句不锁死查询，旧译文不覆盖新句');
+  log('翻译途中左键可继续，换句不显示空义卡片，旧译文不覆盖新句');
   await page.getByRole('button', { name: '继续播放并关闭翻译框' }).click(); await idle();
   await ball().click({ button: 'right' });
   await page.getByLabel('联网翻译总开关').uncheck();

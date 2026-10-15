@@ -41,3 +41,69 @@ html, body, #root { min-height: 100%; background: var(--book-bg); }
 .book-source { border-top: 1px solid var(--book-border); padding-top: 12px; margin-top: 12px; }
 .book-actions { flex-wrap: wrap; }
 @media (max-width: 650px) { .book { padding: 18px; } .book-header { flex-wrap: wrap; } }
+.book { max-width: none; margin: 0; padding: 0; font-size: 15px; }
+.book-header { position: sticky; top: 0; z-index: 5; min-height: 76px; box-sizing: border-box; padding: 16px 30px; border-bottom: 1px solid var(--book-border); background: var(--book-card); }
+.book-header span { font-size: 22px; letter-spacing: -.5px; }
+.book-header small { font-size: 13px; letter-spacing: 0; }
+.book-actions { gap: 8px !important; }
+.book-actions select, .book-actions button { padding: 7px 11px; font-size: 13px; cursor: pointer; }
+.book-actions .fw-primary { background: var(--book-accent); color: var(--book-card); border-color: transparent; }
+.book-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); min-height: calc(100vh - 77px); }
+.book[data-sidebar-collapsed="true"] .book-layout { grid-template-columns: 62px minmax(0, 1fr); }
+.book-sidebar { position: sticky; top: 77px; align-self: start; height: calc(100vh - 77px); overflow-y: auto; box-sizing: border-box; padding: 20px 18px; border-right: 1px solid var(--book-border); background: color-mix(in srgb, var(--book-card) 52%, var(--book-bg)); }
+.book-sidebar-heading { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 650; margin-bottom: 20px; color: var(--book-muted); }
+.book-sidebar-heading button { padding: 0; width: 27px; height: 27px; border: 1px solid var(--book-border); border-radius: 7px; background: var(--book-card); color: var(--book-text); font-size: 20px; cursor: pointer; }
+.book[data-sidebar-collapsed="true"] .book-sidebar { padding: 18px; }
+.book[data-sidebar-collapsed="true"] .book-sidebar-heading > span { display: none; }
+.book-all { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 11px 13px; border: 1px solid transparent; border-radius: 9px; font: inherit; background: transparent; color: var(--book-text); cursor: pointer; text-align: left; }
+.book-all[aria-pressed="true"] { background: var(--book-card); border-color: var(--book-border); color: var(--book-accent); box-shadow: 0 3px 10px #00000004; }
+.book-all strong { font-size: 13px; }
+.book-sidebar-caption, .book-sidebar-empty, .book-privacy-note { color: var(--book-muted); font-size: 12px; margin: 17px 4px; }
+.book-privacy-note { font-size: 11px; line-height: 1.7; border-top: 1px solid var(--book-border); padding-top: 14px; }
+.book-video-list { display: grid; gap: 13px; }
+.book-video { border: 1px solid transparent; border-radius: 10px; padding: 7px; }
+.book-video[data-selected="true"] { background: var(--book-card); border-color: var(--book-border); }
+.book-video-select { display: block; width: 100%; border: none; background: transparent; color: var(--book-text); padding: 0; font: inherit; text-align: left; cursor: pointer; }
+.book-video-select > strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 9px 0 4px; font-size: 13px; font-weight: 600; line-height: 1.5; }
+.book-video-cover { position: relative; aspect-ratio: 16/8; overflow: hidden; display: grid; place-items: center; border-radius: 7px; background: linear-gradient(135deg, color-mix(in srgb, var(--book-accent) 15%, var(--book-bg)), var(--book-bg)); border: 1px solid var(--book-border); color: var(--book-accent); }
+.book-video-cover > span:first-child { font-size: 31px; font-weight: 200; opacity: .6; }
+.book-video-cover img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+.book-video-site { position: absolute; bottom: 5px; left: 7px; font-size: 10px; background: var(--book-card); color: var(--book-muted); padding: 1px 5px; border-radius: 4px; max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-video-meta { display: block; color: var(--book-muted); font-size: 11px; }
+.book-video-links { display: flex; justify-content: space-between; gap: 6px; margin-top: 7px; font-size: 11px; }
+.book-video-links a, .book-video-links button { color: var(--book-accent); text-decoration: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.book-video-links > span { color: var(--book-muted); }
+.book-content { min-width: 0; padding: 30px clamp(22px, 3vw, 64px) 50px; }
+.book-overview { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.book-eyebrow { margin: 0; color: var(--book-muted); font-size: 12px; letter-spacing: 2px; }
+.book h1 { font-size: clamp(23px, 2vw, 31px); line-height: 1.35; margin: 7px 0 8px; font-weight: 650; letter-spacing: -.7px; overflow-wrap: anywhere; }
+.book-subtitle { font-size: 13px; margin: 0; }
+.book-stats { display: flex; flex-shrink: 0; gap: 27px; }
+.book-stats > span { display: grid; text-align: center; color: var(--book-muted); font-size: 11px; }
+.book-stats strong { font-size: 25px; font-weight: 550; line-height: 1.4; color: var(--book-text); }
+.book-search { display: flex; align-items: center; gap: 14px; margin: 27px 0 12px; background: var(--book-card); border: 1px solid var(--book-border); border-radius: 10px; padding: 0 14px; }
+.book-search input { width: 100%; min-width: 0; padding: 13px 0; font: inherit; font-size: 14px; background: transparent; border: 0; outline: none; color: var(--book-text); }
+.book-search > span { white-space: nowrap; font-size: 12px; color: var(--book-muted); }
+.book-filter-panel { border-bottom: 1px solid var(--book-border); padding-bottom: 14px; }
+.book-filter-panel > summary { font-size: 12px; color: var(--book-muted); cursor: pointer; user-select: none; }
+.book-filters { margin-top: 9px; gap: 8px; }
+.book-filters select { font-size: 12px; padding: 6px 9px; border-radius: 7px; }
+.book-sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0 !important; }
+.book-count { font-size: 12px; margin: 16px 0 13px; }
+.book-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 14px; align-items: start; }
+.book-card { min-width: 0; padding: 19px 20px 14px; border-radius: 12px; box-shadow: 0 4px 16px #00000002; }
+.book-card-meta { font-size: 11px; align-items: center; }
+.book-card-meta button { font-size: 11px; }
+.book-card h2 { font: 24px/1.35 Georgia, serif; margin: 13px 0 9px; }
+.book-card > p { font-size: 14px; line-height: 1.65; margin: 0 0 12px; overflow-wrap: anywhere; }
+.book-tags { gap: 5px; }
+.book-tags span { font-size: 10px; padding: 2px 6px; }
+.book-card details { font-size: 12px; margin-top: 15px; }
+.book-card details > summary { cursor: pointer; }
+.book-source strong { font-size: 11px; }
+.book-source p { font-size: 13px; line-height: 1.6; margin: 8px 0; overflow-wrap: anywhere; }
+.book-delete { font-size: 11px; margin-top: 13px; opacity: .75; }
+.book-empty { margin-top: 10px; padding: 50px 25px; font-size: 14px; }
+@media (min-width: 1700px) { .book-layout { grid-template-columns: 280px minmax(0, 1fr); } .book-grid { grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 18px; } }
+@media (max-width: 900px) { .book-header { padding: 14px 18px; } .book-header small { display: none; } .book-layout { grid-template-columns: 205px minmax(0, 1fr); } .book-sidebar { padding: 18px 12px; } .book-stats { gap: 14px; } .book-content { padding: 24px 20px; } }
+@media (max-width: 650px) { .book-header { position: relative; gap: 12px; } .book-header > div:first-child { width: 100%; justify-content: flex-start; } .book-actions { width: 100%; justify-content: flex-start !important; } .book-layout, .book[data-sidebar-collapsed="true"] .book-layout { display: block; } .book-sidebar { position: relative; top: 0; height: auto; border-right: 0; border-bottom: 1px solid var(--book-border); padding: 15px 18px; } .book-sidebar-heading { margin-bottom: 9px; } .book-video-list { display: flex; overflow-x: auto; gap: 12px; padding-bottom: 5px; } .book-video { min-width: 155px; width: 155px; flex-shrink: 0; } .book-sidebar-caption, .book-privacy-note { margin: 9px 4px; } .book-privacy-note { display: none; } .book-content { padding: 23px 18px; } .book-overview { align-items: flex-start; } .book-stats { gap: 12px; } .book-stats strong { font-size: 20px; } .book-subtitle { font-size: 12px; } .book-search { margin-top: 20px; } .book-grid { grid-template-columns: 1fr; } }

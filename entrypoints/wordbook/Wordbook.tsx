@@ -4,7 +4,7 @@ import type { WordbookEntry } from '../../src/core/types';
 import { filterWordbook } from '../../src/core/wordbook-filters';
 import { SaveEntryForm, PARTS, EXAM_TAGS } from '../../src/ui/SaveEntryForm';
 import { FlowMark } from '../../src/ui/Icons';
-import { archiveSnapshot, importArchive, videoSourceLink, type ArchiveSnapshot } from '../../src/storage/archive';
+import { archiveSnapshot, importArchive, videoDisplayMetadata, videoSourceLink, type ArchiveSnapshot } from '../../src/storage/archive';
 import { restoreEntry, validateEntry } from '../../src/storage/wordbook';
 
 const THEMES = [['light', '薄雾森林'], ['dark', '午夜墨绿'], ['warm', '焦糖奶茶'], ['blue', '深海蓝调'], ['lavender', '紫藤花园'], ['rose', '玫瑰信笺'], ['sunset', '落日橘光'], ['mint', '薄荷冰川']];
@@ -23,6 +23,9 @@ export function Wordbook() {
   useLayoutEffect(() => { document.documentElement.dataset.bookTheme = theme; }, [theme]);
   const [archive, setArchive] = useState<ArchiveSnapshot>({ videos: [], captures: [], occurrences: [] });
   const [video, setVideo] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [loadedThumbnails, setLoadedThumbnails] = useState<Set<string>>(new Set());
+  const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(new Set());
   const fileInput = useRef<HTMLInputElement>(null);
   const revision = useRef(0);
   // reload 表示重新读取，无参数，同步最新词本与归档到页面
@@ -51,6 +54,9 @@ export function Wordbook() {
   }, []);   // 从视频返回词本时重新读取，不让已打开的页面停留在旧列表
   const tags = [...new Set(entries.flatMap((entry) => entry.tags))].sort();
   const captureMap = new Map(archive.captures.map((capture) => [capture.id, capture]));
+  const entryIds = new Set(entries.map((entry) => entry.id));
+  const videos = archive.videos.map((source) => ({ ...source, ...videoDisplayMetadata(source), count: new Set(archive.occurrences.filter((item) => entryIds.has(item.entryId) && captureMap.get(item.captureId)?.videoId === source.id).map((item) => item.entryId)).size })).filter((source) => source.count > 0).sort((a, b) => b.updatedAt - a.updatedAt);
+  const selectedVideo = videos.find((source) => source.id === video);
   // occurrenceTime 表示收藏时间轴位置，从 entry 关联语境中取当前视频最早秒数
   // 没有关联时返回无穷大，时间排序会将其放在有时间的条目之后
   const occurrenceTime = (entry: WordbookEntry) => Math.min(...archive.occurrences.filter((item) => item.entryId === entry.id && (!video || captureMap.get(item.captureId)?.videoId === video)).map((item) => captureMap.get(item.captureId)?.time ?? Infinity));
@@ -98,18 +104,29 @@ export function Wordbook() {
     } catch (error) { setError(error instanceof Error ? error.message : '导入失败'); }
     finally { if (fileInput.current) fileInput.current.value = ''; }
   }
-  return <main className="book fw-app" style={{ '--fw-font': '16px' } as React.CSSProperties} data-theme={theme}>
+  return <main className="book fw-app" style={{ '--fw-font': '16px' } as React.CSSProperties} data-theme={theme} data-sidebar-collapsed={sidebarCollapsed}>
     <header className="book-header"><div><FlowMark size={32} /><span>FlowWord <small>学习档案 · 单词本</small></span></div><div className="book-actions"><select aria-label="单词本主题" value={theme} onChange={(event) => { setTheme(event.target.value); void browser.storage.local.set({ 'flowword-book-theme': event.target.value }); }}>{THEMES.map(([id, title]) => <option key={id} value={id}>{title}</option>)}</select><button type="button" onClick={() => fileInput.current?.click()}>导入备份</button><input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={(event) => void importBook(event.target.files?.[0])} /><button type="button" className="fw-primary" onClick={exportBook}>导出单词本</button></div></header>
-    <h1>把理解，留下来。</h1><p className="book-subtitle">单词、短语与整句一起收藏，按词汇类型、考点和你的标签整理 · 本地保存</p>
-    <section className="book-filters" aria-label="单词本筛选">
-      <input aria-label="搜索单词本" placeholder="搜索原文、译文或标签" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} />
+    <div className="book-layout">
+      <aside className="book-sidebar" aria-label="视频资料栏">
+        <div className="book-sidebar-heading"><span>视频资料</span><button type="button" aria-label={sidebarCollapsed ? '展开视频资料栏' : '收起视频资料栏'} aria-expanded={!sidebarCollapsed} onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>{sidebarCollapsed ? '☰' : '‹'}</button></div>
+        {!sidebarCollapsed && <><button className="book-all" type="button" aria-pressed={!video} onClick={() => setVideo('')}><span>全部收藏</span><strong>{entries.length}</strong></button><p className="book-sidebar-caption">{videos.length} 个视频 · 本地资料</p><nav className="book-video-list" aria-label="学习视频">{videos.map((source) => <article className="book-video" key={source.id} data-selected={video === source.id}>
+          <button className="book-video-select" type="button" aria-pressed={video === source.id} aria-label={`查看视频：${source.title}`} onClick={() => { setVideo(source.id); setSort('time'); }}>
+            <div className="book-video-cover">{source.thumbnail && loadedThumbnails.has(source.id) && !failedThumbnails.has(source.id) ? <img src={source.thumbnail} alt={`${source.title} 视频封面`} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedThumbnails((previous) => new Set(previous).add(source.id))} /> : <span aria-hidden="true">▷</span>}<span className="book-video-site">{source.site}</span></div>
+            <strong>{source.title}</strong><span className="book-video-meta">{source.count} 条收藏 · {new Date(source.updatedAt).toLocaleDateString('zh-CN')}</span>
+          </button><div className="book-video-links"><a href={source.url} target="_blank" rel="noreferrer">来源 ↗</a>{source.thumbnail && !loadedThumbnails.has(source.id) && <button type="button" title="点击后请求 YouTube 封面服务器，服务器可获知视频 ID 和网络地址" onClick={() => setLoadedThumbnails((previous) => new Set(previous).add(source.id))}>加载封面</button>}{failedThumbnails.has(source.id) && <span>封面暂不可用</span>}</div>
+        </article>)}</nav>{!videos.length && <p className="book-sidebar-empty">收藏视频中的词句后<br />在这里按视频查看</p>}<p className="book-privacy-note">封面默认不联网<br />点击加载后仅向 YouTube 请求封面</p></>}
+      </aside>
+      <div className="book-content">
+    <section className="book-overview"><div><p className="book-eyebrow">学习资料</p><h1>{selectedVideo?.title || '全部收藏'}</h1><p className="book-subtitle">{selectedVideo ? `${selectedVideo.site} · 按视频时间整理词句` : '单词、表达与整句，保留原来的视频语境'}</p></div><div className="book-stats"><span><strong>{entries.filter((entry) => entry.kind === 'word').length}</strong>单词</span><span><strong>{entries.filter((entry) => entry.kind === 'phrase').length}</strong>表达</span><span><strong>{entries.filter((entry) => entry.kind === 'sentence').length}</strong>整句</span></div></section>
+    <div className="book-search"><input aria-label="搜索单词本" placeholder="搜索词句、译文或标签" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /><span>{visible.length} 条结果</span></div>
+    <details className="book-filter-panel" open><summary>分类与排序 <span>{[filters.kind, filters.part, filters.exam, filters.tag].filter(Boolean).length || ''}</span></summary><section className="book-filters" aria-label="单词本筛选">
       <select aria-label="条目类型筛选" value={filters.kind} onChange={(event) => setFilters({ ...filters, kind: event.target.value })}><option value="">全部条目</option><option value="word">单词</option><option value="phrase">短语</option><option value="sentence">语句</option></select>
       <select aria-label="词汇类型筛选" value={filters.part} onChange={(event) => setFilters({ ...filters, part: event.target.value })}><option value="">全部词汇类型</option>{[...new Set([...PARTS, ...entries.map((entry) => entry.partOfSpeech)])].map((part) => <option key={part}>{part}</option>)}</select>
       <select aria-label="考点筛选" value={filters.exam} onChange={(event) => setFilters({ ...filters, exam: event.target.value })}><option value="">全部考点 / 考试</option>{EXAM_TAGS.map((tag) => <option key={tag}>{tag}</option>)}</select>
       <select aria-label="标签筛选" value={filters.tag} onChange={(event) => setFilters({ ...filters, tag: event.target.value })}><option value="">全部自定义标签</option>{tags.map((tag) => <option key={tag}>{tag}</option>)}</select>
-      <select aria-label="视频分组" value={video} onChange={(event) => { setVideo(event.target.value); if (event.target.value) setSort('time'); }}><option value="">全部视频</option>{archive.videos.filter((source) => archive.occurrences.some((item) => captureMap.get(item.captureId)?.videoId === source.id)).map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}</select>
+      <select className="book-sr-only" aria-label="视频分组" value={video} onChange={(event) => { setVideo(event.target.value); if (event.target.value) setSort('time'); }}><option value="">全部视频</option>{videos.map((source) => <option key={source.id} value={source.id}>{source.title}</option>)}</select>
       <select aria-label="排序方式" value={sort} onChange={(event) => setSort(event.target.value)}><option value="recent">最近加入</option><option value="alphabet">字母顺序</option><option value="kind">条目类型</option><option value="time">视频时间顺序</option></select>
-    </section>
+    </section></details>
     <p className="book-count">显示 {visible.length} / {entries.length} 条</p>{error && <p role="alert">{error}</p>}
     {editing ? <section className="book-editor"><SaveEntryForm key={editing.id} draft={editing} onSave={save} onCancel={() => setEditing(null)} /></section>
       : loading ? <p>正在读取本地单词本…</p> : visible.length ? <div className="book-grid">{visible.map((entry) => <article className="book-card" key={entry.id}>
@@ -118,6 +135,7 @@ export function Wordbook() {
         <div className="book-tags">{[...new Set([...entry.examTags, ...entry.tags])].map((tag) => <span key={tag}>{tag}</span>)}</div>
         <details><summary>查看来源语境</summary>{archive.occurrences.filter((item) => item.entryId === entry.id && (!video || captureMap.get(item.captureId)?.videoId === video)).map((item) => { const capture = captureMap.get(item.captureId); return capture ? { ...capture, occurrenceTranslation: item.translation } : undefined; }).filter((capture) => Boolean(capture)).sort((a, b) => a!.time - b!.time).map((capture) => <section key={capture!.id} className="book-source"><strong>{capture!.title || archive.videos.find((source) => source.id === capture!.videoId)?.title} · {Math.floor(capture!.time / 60)}:{String(Math.floor(capture!.time % 60)).padStart(2, '0')}</strong><p lang="en">{capture!.sentence}</p>{capture!.translation && <p>{capture!.translation}</p>}{capture!.occurrenceTranslation && <p>该语境释义：{capture!.occurrenceTranslation}</p>}<a href={videoSourceLink(capture!)} target="_blank" rel="noreferrer">回到视频这一句</a></section>)}</details>
         <button type="button" className="book-delete" onClick={() => void remove(entry)}>删除条目</button>
-      </article>)}</div> : <div className="book-empty">{entries.length ? '没有符合这些分类的条目，调整筛选再试' : '还没有条目。在翻译框点击「加入」或「加入整句」开始记录。'}</div>}
+      </article>)}</div> : <div className="book-empty">{entries.length ? '没有符合这些分类的条目，调整筛选再试' : '还没有条目，在翻译框点击「加入」或「加入整句」开始记录'}</div>}
+    </div></div>
   </main>;
 }

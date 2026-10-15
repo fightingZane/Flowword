@@ -62,8 +62,8 @@ try {
   assert.equal(await pauseState(), false);
   assert.equal(await dialog().count(), 0);
   const dragged = await ball().boundingBox();
-  assert.equal(Math.round(dragged.x), 14);
-  log('拖动贴边且不误暂停、不打开面板');
+  assert.equal(Math.round(dragged.x), 53);
+  log('自由拖动保留网页内部位置且不误暂停、不打开面板');
   await page.waitForTimeout(200);
 
   await ball().click();
@@ -302,7 +302,7 @@ try {
   await setupPage();
   await ball().waitFor();
   const reopened = await ball().boundingBox();
-  assert.equal(Math.round(reopened.x), 14);
+  assert.equal(Math.round(reopened.x), 53);
   assert.deepEqual(await run.worker.evaluate(async () => (await chrome.storage.local.get('flowword.position.v1'))['flowword.position.v1']), storedPosition);
   log('关闭重启测试浏览器后开关和悬浮球位置持久化');
 

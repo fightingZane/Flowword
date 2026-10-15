@@ -13,3 +13,10 @@ InteractionController以操作编号与AbortSignal阻止过期结果；enrich并
 浮框固定width/height，以flex内滚动支持字体独立。Pointer Capture处理移动/缩放，抬起用最后尺寸ref防同帧旧state。词本主题独立保存，主题变量在documentElement，html/body/root与内容区共用背景，覆盖两侧及底部。
 
 0.3.1仅对DeepSeek官方域请求thinking disabled与任务输出上限，其他服务不附加专属参数。cache store继续v1，整句和表达各自保存校验JSON，键增加语言/提示版本/思考配置。旧预译只整句，新prefetchExpressions默认false，用户独立开启后每新句最多多一次解析调用，同20句预算。
+
+## 0.4 阅读与收藏状态
+球位置默认free，可选edge，仍以可视区域归一坐标持久化
+面板打开和网页focus从后台读取收藏，保存确认后更新标识，不禁用重复表达的新语境收藏
+表达推荐先校验中文义再slice，参考义来源名动态展示；MyMemory明确标参考机译
+词本使用视频侧栏和响应式卡片，封面默认本地占位，仅主动加载YouTube图片
+云质量缓存v4只归一空白，保留大小写字形标点与重复真实邻句
