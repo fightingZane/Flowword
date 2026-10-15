@@ -23,7 +23,7 @@ export async function effectiveProvider(): Promise<ProviderConfig> {
   const config = await readProvider();
   const stored = await browser.storage.local.get(STORAGE.onlineTranslation);
   if (config) return { ...config, mode: stored[STORAGE.onlineTranslation] === true ? config.mode : 'off' };
-  return { ...DEFAULT_PROVIDER, mode: stored[STORAGE.onlineTranslation] === true ? 'mymemory' : 'off' };
+  return { ...DEFAULT_PROVIDER, mode: stored[STORAGE.onlineTranslation] === true ? 'cloud' : 'off' };
 }
 // normalizeLearningInput 规范原句与最多两句邻文本，仅合并空白并移除完整等于当前句的邻句，保留字形大小写标点及重复邻句顺序
 export function normalizeLearningInput(sentence: string, context: string[]): { sentence: string; context: string[] } {
@@ -38,6 +38,7 @@ export async function learningRequest(sentence: string, context: string[], task:
   if (typeof sentence !== 'string' || !sentence.trim() || sentence.length > 6000) throw new Error('字幕文本无效或过长');
   ({ sentence, context } = normalizeLearningInput(sentence, context));
   const config = await effectiveProvider();
+  if (config.mode === 'cloud' && !config.apiKey) throw new Error('请在悬浮框模型设置中填写 DeepSeek API Key 并保存');
   if (config.mode === 'off') throw new Error('请先在服务设置中启用翻译');
   if (config.mode === 'cloud' && !await browser.permissions.contains({ origins: [new URL(config.endpoint).origin + '/*'] })) throw new Error('请在服务设置中授权接口访问');
   if (priority === 'prefetch' && (!config.prefetch || (task === 'context' && config.prefetchExpressions !== true))) return { skipped: true };

@@ -18,7 +18,7 @@ export function Wordbook() {
   const [editing, setEditing] = useState<WordbookEntry | null>(null);
   const [filters, setFilters] = useState({ search: '', kind: '', part: '', exam: '', tag: '' });
   const [sort, setSort] = useState('recent');
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState('dark');
   // 此布局回调无参数，把当前theme同步到整页根节点，避免两侧与滚动背景仍用默认浅色
   useLayoutEffect(() => { document.documentElement.dataset.bookTheme = theme; }, [theme]);
   const [archive, setArchive] = useState<ArchiveSnapshot>({ videos: [], captures: [], occurrences: [] });

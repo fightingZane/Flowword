@@ -20,3 +20,9 @@ InteractionController以操作编号与AbortSignal阻止过期结果；enrich并
 表达推荐先校验中文义再slice，参考义来源名动态展示；MyMemory明确标参考机译
 词本使用视频侧栏和响应式卡片，封面默认本地占位，仅主动加载YouTube图片
 云质量缓存v4只归一空白，保留大小写字形标点与重复真实邻句
+
+## 0.5 内嵌入口
+模型设置使用web accessible settings.html的扩展来源iframe，Key仍仅扩展DB/ref且不回填input
+内容脚本面板只获得公开服务信息，设置iframe不使用postMessage传Key
+Popup用FLOWWORD_PANEL_OPEN通知当前已授权视频的内容脚本切换面板，快捷词本只有完整入口创建网页
+NeighborLine在当前拼句范围外筛真实邻句，展开才查询，卸载忽略旧结果

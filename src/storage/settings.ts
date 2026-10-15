@@ -9,7 +9,7 @@ export const STORAGE = {
   onlineTranslation: 'flowword.onlineTranslation.v1',
 } as const;
 
-export const DEFAULT_APPEARANCE: Appearance = { fontSize: 16, panelTheme: 'auto', ballColor: '#355f47', ballStyle: 'glass', ballPlacement: 'free', ballOpacity: 90, panelWidth: 460, panelHeight: 620 };
+export const DEFAULT_APPEARANCE: Appearance = { fontSize: 16, panelTheme: 'dark', ballColor: '#355f47', ballStyle: 'glass', ballPlacement: 'free', ballOpacity: 90, panelWidth: 460, panelHeight: 620 };
 export const DEFAULT_SETTINGS: Settings = { enabled: false, position: { x: 1, y: 0.62 }, offset: 0, appearance: DEFAULT_APPEARANCE, onlineTranslation: false };
 
 export function sanitizeAppearance(value: unknown): Appearance {
@@ -17,7 +17,7 @@ export function sanitizeAppearance(value: unknown): Appearance {
   const number = (value: unknown, min: number, max: number, fallback: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
   return {
     fontSize: number(input.fontSize, 14, 24, 16),
-    panelTheme: ['auto', 'light', 'dark', 'warm', 'blue', 'forest', 'purple', 'sunset', 'rose', 'ink'].includes(input.panelTheme ?? '') ? input.panelTheme! : 'auto',
+    panelTheme: ['auto', 'light', 'dark', 'warm', 'blue', 'forest', 'purple', 'sunset', 'rose', 'ink'].includes(input.panelTheme ?? '') ? input.panelTheme! : 'dark',
     ballColor: /^#[0-9a-f]{6}$/i.test(input.ballColor ?? '') ? input.ballColor! : '#355f47',
     ballStyle: ['glass', 'solid', 'outline'].includes(input.ballStyle ?? '') ? input.ballStyle! : 'glass',
     ballPlacement: input.ballPlacement === 'edge' ? 'edge' : 'free',

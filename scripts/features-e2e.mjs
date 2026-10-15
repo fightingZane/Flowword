@@ -95,7 +95,15 @@ try {
   assert.notEqual(scroll.color, 'auto');
   log('右键只配置不暂停，字体主题颜色和风格实时生效');
 
+  const referenceSettings = await run.context.newPage();
+  await referenceSettings.goto(`chrome-extension://${run.extensionId}/settings.html`);
+  await referenceSettings.getByLabel('服务', { exact: true }).selectOption('mymemory');
+  await referenceSettings.getByRole('button', { name: '授权接口并保存' }).click();
+  await referenceSettings.getByText('配置已保存', { exact: false }).waitFor();
+  await run.worker.evaluate(() => chrome.storage.local.set({ 'flowword.onlineTranslation.v1': false }));
+  await referenceSettings.close(); await page.bringToFront();
   const network = page.getByLabel('联网翻译总开关');
+  await page.waitForFunction(() => document.querySelector('flowword-ui')?.shadowRoot?.querySelector('.fw-network-setting input')?.checked === false);
   assert.equal(await network.isChecked(), false);
   assert.match(await page.getByRole('dialog').innerText(), /可能长期保存/);
   await network.check();

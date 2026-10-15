@@ -3,6 +3,9 @@ import { BALL_SIZE, DRAG_THRESHOLD, bubblePosition, constrain, rememberPosition,
 import type { InteractionController } from '../core/interaction-controller';
 import type { Appearance, BallPosition, Point, Settings, WordbookEntry } from '../core/types';
 import { browser } from 'wxt/browser';
+import { QuickWordbook } from './QuickWordbook';
+import { NeighborLine } from './NeighborLine';
+import './quick-wordbook.css';
 import { SettingsPanel } from './SettingsPanel';
 import { SaveEntryForm } from './SaveEntryForm';
 import { FlowMark, Icon } from './Icons';
@@ -17,6 +20,7 @@ interface Props {
   onOffset(offset: number): Promise<void>;
   onAppearance(appearance: Partial<Appearance>): Promise<void>;
   onOnlineTranslation(value: boolean): Promise<void>;
+  requestedPanel?: { view: 'provider' | 'book'; revision: number };
   onRepeat?(): Promise<void>;
   onFollow?(): Promise<void>;
 }
@@ -32,7 +36,7 @@ const clock = (seconds: number) => {
 // FloatingApp 渲染球与学习面板，controller提供当前状态，settings提供已保存配置
 // onPosition和onOffset保存位置与偏移，onAppearance和onOnlineTranslation保存外观与联网开关
 // onRepeat和onFollow是可选播放动作，仅在已授权内容脚本挂载，不接收或显示API密钥
-export function FloatingApp({ controller, settings, onPosition, onOffset, onAppearance, onOnlineTranslation, onRepeat, onFollow }: Props) {
+export function FloatingApp({ controller, settings, onPosition, onOffset, onAppearance, onOnlineTranslation, requestedPanel, onRepeat, onFollow }: Props) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const [screen, setScreen] = useState(viewport);
   const [point, setPoint] = useState(() => restorePosition(settings.position, viewport()));
@@ -46,6 +50,8 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   const [manualPoint, setManualPoint] = useState<Point | null>(null);
   const panelGesture = useRef<{ id: number; x: number; y: number; width: number; height: number; point: Point; resize: boolean } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [secondaryView, setSecondaryView] = useState<'provider' | 'book' | null>(null);
+  useEffect(() => { if (requestedPanel) { setSecondaryView(requestedPanel.view); setSettingsOpen(false); } }, [requestedPanel?.revision]);
   const [draft, setDraft] = useState<WordbookEntry | null>(null);
   const [savedEntries, setSavedEntries] = useState<WordbookEntry[]>([]);
   const savedRevision = useRef(0);
@@ -56,7 +62,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   const drag = useRef<{ id: number; origin: Point; startPoint: Point; point: Point; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const visible = settingsOpen || state.phase !== 'IDLE';
+  const visible = Boolean(secondaryView) || settingsOpen || state.phase !== 'IDLE';
   const busy = ['CAPTURING', 'ANALYZING', 'RESUME'].includes(state.phase);
   const panelWidth = Math.min(size.width, Math.max(180, screen.width - 24));
   const displayHeight = Math.min(size.height, Math.max(120, screen.height - 24));
@@ -122,6 +128,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
 
   // close 收起配置或分析面板，无参数，由叉号和Escape调用，不自动恢复视频
   function close() {
+    if (secondaryView) { setSecondaryView(null); setSettingsOpen(false); return; }
     if (settingsOpen) { setSettingsOpen(false); return; }
     setDraft(null);
     controller.close();
@@ -207,7 +214,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
       aria-expanded={visible}
       aria-controls="flowword-bubble"
       title="左键暂停 / 继续 · 右键配置 · 拖动调整位置"
-      onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setSettingsOpen(true); }}
+      onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setSecondaryView(null); setSettingsOpen(true); }}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         suppressClick.current = false;
@@ -230,7 +237,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
       onLostPointerCapture={() => { drag.current = null; setDragging(false); }}
       onClick={(event) => {
         if (suppressClick.current && event.detail !== 0) { suppressClick.current = false; return; }
-        setSettingsOpen(false); setDraft(null);
+        setSettingsOpen(false); setSecondaryView(null); setDraft(null);
         if (state.phase !== 'IDLE') void controller.resume();   // 再次左键就是继续观看，不只收起面板
         else void controller.capture(settings.offset);
       }}
@@ -245,7 +252,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
       id="flowword-bubble"
       className="fw-bubble"
       role="dialog"
-      aria-label={settingsOpen ? 'FlowWord 配置框' : 'FlowWord 字幕面板'}
+      aria-label={secondaryView === 'provider' ? 'FlowWord 模型设置' : secondaryView === 'book' ? 'FlowWord 快捷单词本' : settingsOpen ? 'FlowWord 配置框' : 'FlowWord 字幕面板'}
       style={{ left: panelPoint.x, top: panelPoint.y, width: panelWidth, height: displayHeight, maxHeight: Math.max(120, screen.height - 24) }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') { event.preventDefault(); close(); }
@@ -261,13 +268,14 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
         const gesture = panelGesture.current;
         if (gesture?.id === event.pointerId && !gesture.resize) setManualPoint(boundPanel({ x: gesture.point.x + event.clientX - gesture.x, y: gesture.point.y + event.clientY - gesture.y }));
       }} onPointerUp={() => { panelGesture.current = null; }} onPointerCancel={() => { panelGesture.current = null; }}>
-        <div className="fw-brand"><span className="fw-mini-mark"><FlowMark size={17} /></span><span>FlowWord</span><span className="fw-dot-separator">/</span><span className="fw-brand-caption">{settingsOpen ? '配置' : '这一句'}</span></div>
-        {!settingsOpen && <button type="button" className="fw-header-config" onClick={() => setSettingsOpen(true)}>配置</button>}
+        <div className="fw-brand"><span className="fw-mini-mark"><FlowMark size={17} /></span><span>FlowWord</span><span className="fw-dot-separator">/</span><span className="fw-brand-caption">{secondaryView === 'provider' ? '模型设置' : secondaryView === 'book' ? '单词本' : settingsOpen ? '配置' : '这一句'}</span></div>
+        {!settingsOpen && !secondaryView && <button type="button" className="fw-header-config" onClick={() => setSecondaryView('book')}>单词本</button>}
+        {!settingsOpen && !secondaryView && <button type="button" className="fw-header-config" onClick={() => { setSecondaryView(null); setSettingsOpen(true); }}>配置</button>}
         <button type="button" data-close className="fw-icon-button" aria-label="关闭面板，保持视频暂停" title="关闭面板 · 保持暂停" onClick={close}><Icon name="close" size={16} /></button>
       </header>
 
       <div className="fw-body" aria-live="polite" aria-busy={busy}>
-        {settingsOpen ? <SettingsPanel settings={settings} onAppearance={onAppearance} onError={flash} onOnline={async (value) => {
+        {secondaryView === 'provider' ? <iframe className="fw-provider-frame" src={browser.runtime.getURL('/settings.html') + '?embedded=1'} title="模型与快捷键设置" /> : secondaryView === 'book' ? <QuickWordbook onOpenFull={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })} /> : settingsOpen ? <SettingsPanel onProvider={() => { setSettingsOpen(false); setSecondaryView('provider'); }} settings={settings} onAppearance={onAppearance} onError={flash} onOnline={async (value) => {
           await onOnlineTranslation(value);
           if (state.context) void controller.capture(settings.offset);
         }} /> : draft ? <SaveEntryForm draft={draft} onSave={save} onCancel={() => setDraft(null)} /> : <>
@@ -279,6 +287,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
 
         {!busy && state.context && <>
           <div className="fw-eyebrow"><span className="fw-source-dot" />{state.context.isPartial ? '字幕片段' : '字幕原文'}<span className="fw-time">{clock(state.context.targetTime)}</span></div>
+          {state.context.learning?.timeline?.filter((line) => line.end <= observedSentenceRange(state.context!).start).slice(-1).map((line) => <NeighborLine key={`${contextKey}:before:${line.start}`} line={line} current={state.context!.text} online={settings.onlineTranslation} label="上文" />)}
           <p className="fw-sentence" lang="en">{state.context.text}</p>
           {state.context.learning && <div className="fw-current-translation">
             {state.context.learning.translation ? <p className="fw-translation">{state.context.learning.translation}</p>
@@ -287,15 +296,16 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
               : <p className="fw-learning-note" role="status">{state.context.learning.error || '暂没有可用译文'}</p>}
             <div className="fw-translation-label">当前句译文 <span>{state.context.learning.provider || '参考翻译'}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
           </div>}
-          {state.context.learning?.provider === 'mymemory' && <p className="fw-context-note">MyMemory 参考机译 · 无语境分析 <button type="button" onClick={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_SETTINGS_OPEN' })}>配置语境模型 ↗</button></p>}
+          {state.context.learning?.provider === 'mymemory' && <p className="fw-context-note">MyMemory 参考机译 · 无语境分析 <button type="button" onClick={() => { setSecondaryView('provider'); setSettingsOpen(false); }}>配置语境模型 ↗</button></p>}
+          {state.context.learning?.timeline?.filter((line) => line.start >= observedSentenceRange(state.context!).end).slice(0, 1).map((line) => <NeighborLine key={`${contextKey}:after:${line.start}`} line={line} current={state.context!.text} online={settings.onlineTranslation} label="下文" />)}
           <div className="fw-current-actions">
             <button type="button" className="fw-primary" onClick={() => add(state.context!.text, 'sentence', state.context!.learning?.translation || '', state.context!.text, '句子')}>{saved('sentence', state.context.text) ? '已加入整句' : '收藏整句'}</button>
             {onRepeat && <button type="button" className="fw-retry" onClick={() => void onRepeat().catch((error) => flash(error instanceof Error ? error.message : '无法重听'))}>重听这一句 ↻</button>}
             {onFollow && <button type="button" className="fw-retry" onClick={() => void onFollow().catch((error) => flash(error instanceof Error ? error.message : '无法跟随'))}>字幕跟随 ▷</button>}
           </div>
           {state.context.learning && <div className="fw-learning" key={`${state.context.selected.start}:${state.context.text}`}>
-            {state.context.learning.timeline?.filter((line) => line.end <= state.context!.selected.start).slice(-1).map((line) => <div className="fw-neighbor" key={line.start}><p>{line.text}</p><p>{line.translation || '上下文译文尚未准备'}</p></div>)}
-            {state.context.learning.timeline?.filter((line) => line.start >= state.context!.selected.end).slice(0, 1).map((line) => <div className="fw-neighbor" key={line.start}><p>{line.text}</p><p>{line.translation || '上下文译文尚未准备'}</p></div>)}
+
+
             <div className="fw-learning-title">优先看这些表达 <span>专业词 · 地道搭配 · 非概率</span></div>
             {expressions.map((expression) => <div className="fw-candidate fw-context-expression" key={expression.text}>
               <div className="fw-candidate-title"><strong>{expression.text}</strong><span className="fw-kind">{expression.partOfSpeech}</span><button type="button" onClick={() => add(expression.text, expression.kind, expression.meaning, expression.text, expression.partOfSpeech)} title="已收藏的表达仍可点击记录当前语境">{saved(expression.kind, expression.text) ? '已加入' : '加入'}</button></div>
@@ -357,7 +367,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
       }} onPointerUp={() => { if (panelGesture.current?.resize) void onAppearance({ panelWidth: liveSize.current.width, panelHeight: liveSize.current.height }).catch(() => flash('尺寸保存失败')); panelGesture.current = null; }} onPointerCancel={() => { panelGesture.current = null; }}>◢</button>
 
       {!draft && <footer className="fw-footer">
-        {settingsOpen ? <><button type="button" className="fw-retry" onClick={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })}>打开单词本</button><button type="button" className="fw-primary" onClick={() => setSettingsOpen(false)}>配置完成</button></> : <>
+        {secondaryView ? <><button type="button" className="fw-retry" onClick={() => { setSecondaryView(null); setSettingsOpen(true); }}>返回配置</button><button type="button" className="fw-primary" onClick={() => { setSecondaryView(null); setSettingsOpen(false); }}>返回字幕</button></> : settingsOpen ? <><button type="button" className="fw-retry" onClick={() => { setSecondaryView('book'); setSettingsOpen(false); }}>打开单词本</button><button type="button" className="fw-primary" onClick={() => setSettingsOpen(false)}>配置完成</button></> : <>
         <span><Icon name="pause" size={13} />{state.canResume ? '视频已为你暂停' : '按原有播放状态结束'}</span>
         <button type="button" className="fw-primary" disabled={state.phase === 'RESUME'} onClick={() => void controller.resume()}>
           {state.canResume ? <>继续观看<Icon name="play" size={15} /></> : <>完成<Icon name="check" size={15} /></>}

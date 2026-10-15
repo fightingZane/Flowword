@@ -75,9 +75,20 @@ export function Popup() {
     finally { setSaving(false); }
   }
 
+  // openPanel 打开当前视频悬浮面板，view选择模型或快捷词本，失败保留提示而不创建网页
+  async function openPanel(view: 'provider' | 'book') {
+    try {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error('请先打开视频页面');
+      const result = await browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_PANEL_OPEN', view });
+      if (!result?.ok) throw new Error(result?.error || '请先开启悬浮球并刷新视频页面');
+      window.close();
+    } catch { setError('请先在已授权的视频页面开启悬浮球，再打开此面板'); }
+  }
+
   return <main className="popup">
-    <header><div className="logo"><FlowMark size={24} /></div><span className="wordmark">FlowWord</span><span className="version">0.3</span></header>
-    <div className="intro"><span className="eyebrow">A SMALL PAUSE. A LITTLE MORE CLARITY.</span><h1>停一下，<br /><span>看懂这一句。</span></h1><p>在英文视频里，留住刚才没听懂的字幕。<br />不必复制，不必离开。</p></div>
+    <header><div className="logo"><FlowMark size={24} /></div><span className="wordmark">FlowWord</span><span className="version">{browser.runtime.getManifest().version}</span></header>
+    <div className="intro"><span className="eyebrow">A SMALL PAUSE. A LITTLE MORE CLARITY.</span><h1>停一下，<br /><span>看懂这一句</span></h1><p>在英文视频里，留住刚才没听懂的字幕<br />不必复制，不必离开</p></div>
     <section className={`switch-card ${settings.enabled ? 'enabled' : ''}`}>
       <div><strong>视频悬浮球</strong><span>{settings.enabled ? '已开启 · 在授权站显示' : '已关闭 · 由你决定何时开启'}</span></div>
       <button type="button" role="switch" aria-checked={settings.enabled} aria-label="YouTube 悬浮球开关" disabled={loading || saving || (!page && !settings.enabled)} onClick={() => void toggle()}><span /></button>
@@ -86,6 +97,6 @@ export function Popup() {
     {siteOrigin && <button type="button" disabled={saving} onClick={() => void enableSite()}>在此网站启用 · {siteOrigin}</button>}
     {error && <p className="error" role="alert">{error}</p>}
     <div className="howto"><div><span>01</span><p>打开视频的 <b>English 字幕</b></p></div><div><span>02</span><p>点击悬浮球，暂停并查看原文</p></div><div><span>03</span><p>点击「继续观看」，接着听</p></div></div>
-    <footer><button type="button" onClick={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })}>打开单词本<Icon name="arrow" size={14} /></button><button type="button" onClick={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_SETTINGS_OPEN' })}>云端模型与快捷键设置<Icon name="arrow" size={14} /></button><button type="button" onClick={() => void resetPosition()}>重置悬浮球位置<Icon name="arrow" size={14} /></button><span>右键悬浮球配置外观</span></footer>
+    <footer><button type="button" onClick={() => void openPanel('book')}>打开单词本<Icon name="arrow" size={14} /></button><button type="button" onClick={() => void openPanel('provider')}>云端模型与快捷键设置<Icon name="arrow" size={14} /></button><button type="button" onClick={() => void resetPosition()}>重置悬浮球位置<Icon name="arrow" size={14} /></button><span>右键悬浮球配置外观</span></footer>
   </main>;
 }

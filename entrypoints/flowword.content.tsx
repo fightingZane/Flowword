@@ -162,8 +162,9 @@ export default defineContentScript({
 
     // render 意为刷新悬浮界面，无参数，挂载和外观配置变更时调用
     // 只把安全的学习状态及操作回调交给网页 UI，云端密钥不会传入组件
+    let requestedPanel: { view: 'provider' | 'book'; revision: number } | undefined;
     function render() {
-      root?.render(<FloatingApp controller={controller} settings={settings}
+      root?.render(<FloatingApp controller={controller} settings={settings} requestedPanel={requestedPanel}
         onPosition={(position) => writeSetting('position', position)}
         onOffset={(offset) => writeSetting('offset', offset)}
         onAppearance={writeAppearance}
@@ -266,6 +267,11 @@ export default defineContentScript({
       if (sender.id !== browser.runtime.id || !message || typeof message !== 'object' || !('type' in message)) return;
       if (message.type === 'FLOWWORD_PING') return Promise.resolve({ type: 'FLOWWORD_STATUS', isVideoPage: Boolean(pageKey()), enabled: settings.enabled,
         phase: controller.getSnapshot().phase, version: browser.runtime.getManifest().version } satisfies PageStatus);
+      if (message.type === 'FLOWWORD_PANEL_OPEN' && 'view' in message && (message.view === 'provider' || message.view === 'book')) {
+        if (!settings.enabled || !mounted || !pageKey()) return Promise.resolve({ ok: false, error: '请先开启悬浮球并打开视频页面' });
+        requestedPanel = { view: message.view, revision: (requestedPanel?.revision ?? 0) + 1 };
+        render(); return Promise.resolve({ ok: true });
+      }
       if (message.type === 'FLOWWORD_PROVIDER_CHANGED') { attemptedPrefetch.clear(); void refreshProvider(); return Promise.resolve({ ok: true }); }
       if (message.type === 'FLOWWORD_SITE_REVOKED' && !youtube) {
         const revoked = 'origins' in message && Array.isArray(message.origins) && message.origins.includes(location.origin + '/*');

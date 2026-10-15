@@ -1,0 +1,16 @@
+.fw-quick-book { display: flex; flex-direction: column; min-height: 0; color: var(--fw-ink); }
+.fw-quick-book-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 15px; }
+.fw-quick-book-heading h2 { margin: 0 0 5px; font-size: calc(var(--fw-font, 16px) * 1.15); font-weight: 600; }
+.fw-quick-book-heading span, .fw-quick-book-footer > span { color: var(--fw-muted); font-size: calc(var(--fw-font, 16px) * .75); }
+.fw-quick-book-refresh { padding: 5px 9px; border-radius: 6px; background: var(--fw-wash); color: var(--fw-ink); }
+.fw-quick-book-search { display: grid; gap: 5px; font-size: calc(var(--fw-font, 16px) * .8); color: var(--fw-muted); }
+.fw-quick-book-search input { box-sizing: border-box; width: 100%; min-width: 0; background: var(--fw-wash); border: 1px solid var(--fw-line); border-radius: 8px; color: var(--fw-ink); padding: 10px 11px; font: inherit; }
+.fw-quick-book-search input:focus-visible { outline: 2px solid var(--fw-green); outline-offset: 2px; }
+.fw-quick-book-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.fw-quick-book-list li { padding: 13px 0; border-bottom: 1px solid var(--fw-line); }
+.fw-quick-book-meta { display: flex; justify-content: space-between; gap: 10px; color: var(--fw-muted); font-size: calc(var(--fw-font, 16px) * .7); }
+.fw-quick-book-list strong { display: block; margin-top: 6px; font: 600 calc(var(--fw-font, 16px) * 1.05)/1.5 Georgia, serif; overflow-wrap: anywhere; }
+.fw-quick-book-list p { margin: 5px 0 0; font-size: calc(var(--fw-font, 16px) * .87); line-height: 1.6; overflow-wrap: anywhere; }
+.fw-quick-book-message { color: var(--fw-muted); padding: 20px 0; font-size: calc(var(--fw-font, 16px) * .87); }
+.fw-quick-book-footer { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 3px; background: var(--fw-paper); }
+.fw-quick-book-footer button { padding: 6px 8px; color: var(--fw-ink); background: var(--fw-wash); border-radius: 6px; font-size: calc(var(--fw-font, 16px) * .8); }

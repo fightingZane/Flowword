@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { THEMES } from './themes';
 import { browser } from 'wxt/browser';
 
-interface Props { settings: Settings; onAppearance(value: Partial<Appearance>): Promise<void>; onOnline(value: boolean): Promise<void>; onError(message: string): void }
+interface Props { settings: Settings; onAppearance(value: Partial<Appearance>): Promise<void>; onOnline(value: boolean): Promise<void>; onError(message: string): void; onProvider(): void }
 
 // SettingsPanel 渲染网页内的非敏感设置，settings是当前配置
 // onAppearance和onOnline保存用户修改，onError显示失败，API密钥必须在独立扩展页输入
-export function SettingsPanel({ settings, onAppearance, onOnline, onError }: Props) {
+export function SettingsPanel({ settings, onAppearance, onOnline, onError, onProvider }: Props) {
   const appearance = settings.appearance;
   const [online, setOnline] = useState(settings.onlineTranslation);
   useEffect(() => setOnline(settings.onlineTranslation), [settings.onlineTranslation]);
@@ -36,10 +36,10 @@ export function SettingsPanel({ settings, onAppearance, onOnline, onError }: Pro
         const value = event.target.checked; setOnline(value);
         void onOnline(value).catch(() => { setOnline(settings.onlineTranslation); onError('联网设置保存失败'); });
       }} /></label>
-      <p>开启后，字幕发送至独立设置页选定的服务，不发送视频地址或浏览历史<br />云端语境模型可能收费；MyMemory 可能长期保存文本，并交给第三方机译服务处理，请勿用于敏感内容<br />尚未配置时沿用 MyMemory 整句参考翻译，不逐词查询</p>
+      <p>开启后，字幕发送至模型设置选定的服务，不发送视频地址或浏览历史<br />云端语境模型可能收费；MyMemory 可能长期保存文本，并交给第三方机译服务处理，请勿用于敏感内容<br />默认使用 DeepSeek，填写密钥并保存后生效；也可主动选择 MyMemory</p>
     </div>
-    <button type="button" className="fw-retry" onClick={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_SETTINGS_OPEN' })}>云端模型与快捷键设置 ↗</button>
-    <p className="fw-context-note">密钥仅在独立扩展设置页输入；网页内不保存密钥</p>
+    <button type="button" className="fw-retry" onClick={onProvider}>云端模型与快捷键设置 ↗</button>
+    <p className="fw-context-note">密钥在嵌入的扩展设置中输入，不交给视频网页</p>
     <button type="button" className="fw-retry" onClick={() => void onAppearance({ ...DEFAULT_APPEARANCE }).catch(() => onError('重置失败'))}>恢复默认外观</button>
   </div>;
 }

@@ -9,7 +9,7 @@ export default defineConfig({
     host_permissions: ['https://api.mymemory.translated.net/*'],   // 只访问固定翻译服务，用户开启联网后才请求
     optional_host_permissions: ['https://*/*', 'http://*/*'],   // 跨站与自选接口需要用户逐站授权，安装时不取得全站访问
     content_scripts: [{ matches: ['https://www.youtube.com/*'], js: ['content-scripts/flowword.js'], run_at: 'document_idle', all_frames: false }],
-    web_accessible_resources: [{ resources: ['content-scripts/flowword.css'], matches: ['https://*/*', 'http://*/*'] }],
+    web_accessible_resources: [{ resources: ['content-scripts/flowword.css', 'settings.html'], matches: ['https://*/*', 'http://*/*'] }],
     commands: {
       'flowword-toggle': { suggested_key: { default: 'Alt+Shift+P' }, description: '暂停捕获 / 继续观看' },
       'flowword-repeat': { suggested_key: { default: 'Alt+Shift+R' }, description: '重听当前字幕片段' },

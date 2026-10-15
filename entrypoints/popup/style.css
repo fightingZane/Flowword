@@ -50,3 +50,17 @@ footer button { margin-bottom: 12px; }
   footer { border-color: #3b4d3c; }
   footer button { color: #b8cba9; }
 }
+:root { color-scheme: dark; background: #192b24; color: #e4eee5; }
+.logo { color: #deedcf; background: #355f47; }
+.version { color: #adc1ae; border-color: #40594a; }
+.eyebrow, .intro p, .page-hint, .howto p { color: #b0c0af; }
+h1 span { color: #a6c78f; }
+.switch-card { background: #263c2f; border-color: #405542; }
+.switch-card div > span, .howto > div > span, footer > span { color: #a8bba3; }
+.switch-card button { background: #65785e; }
+.switch-card.enabled button { background: #6f9667; }
+.page-hint > span { background: #82927a; }
+.page-hint > span.connected { background: #a0c583; }
+footer { border-color: #405542; }
+footer button { color: #bdd6ab; }
+.error { color: #edb08d; }

@@ -1,6 +1,6 @@
 export type ProviderMode = 'off' | 'cloud' | 'mymemory';
 export interface ProviderConfig { mode: ProviderMode; endpoint: string; model: string; apiKey: string; prefetch: boolean; prefetchExpressions?: boolean }
-export const DEFAULT_PROVIDER: ProviderConfig = { mode: 'off', endpoint: 'https://api.openai.com/v1/chat/completions', model: '', apiKey: '', prefetch: false, prefetchExpressions: false };
+export const DEFAULT_PROVIDER: ProviderConfig = { mode: 'off', endpoint: 'https://api.deepseek.com/chat/completions', model: 'deepseek-flash', apiKey: '', prefetch: false, prefetchExpressions: false };
 let database: Promise<IDBDatabase> | undefined;
 // open 打开扩展来源的服务数据库，无参数，后台和独立设置页复用
 // 网页内容脚本不得导入调用，密钥不写入它可读取的storage.local

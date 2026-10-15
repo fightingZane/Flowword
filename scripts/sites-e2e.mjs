@@ -245,6 +245,8 @@ try {
   await page.locator('#main').evaluate((video) => { video.srcObject = null; video.load(); });
   await page.waitForFunction(() => Number.isFinite(document.querySelector('#main').duration));
   await page.evaluate(() => window.makeLive()); await page.waitForFunction(() => document.querySelector('#main').duration === Infinity);
+  await page.bringToFront();
+  await until(async () => await state() === 'IDLE');   // 新媒体先清除旧字幕归属，再测试直播捕获拒绝
   await command('toggle-playback'); assert.equal(await state(), 'ERROR'); assert.equal(await paused(), false);
   log('真实 MediaStream Infinity 直播被拒绝且不暂停');
 
