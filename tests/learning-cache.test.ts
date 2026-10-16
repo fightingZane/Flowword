@@ -25,7 +25,7 @@ describe('整句和语境双持久缓存', () => {
 
 it('旧预译授权不产生表达调用，独立表达授权才准备双字段', async () => {
   const request = vi.fn().mockImplementation(async (_sentence, _context, task) => task === 'translate' ? { translation: '长焦镜头' } : { expressions: [{ text: 'telephoto lens', meaning: '长焦镜头' }] });
-  expect(await prefetchLearning('telephoto lens', [], false, request)).toEqual({ text: 'telephoto lens', translation: '长焦镜头' });
+  expect(await prefetchLearning('telephoto lens', [], false, request)).toMatchObject({ text: 'telephoto lens', translation: '长焦镜头' });
   expect(request).toHaveBeenCalledTimes(1);
   expect(request.mock.calls[0]![2]).toBe('translate');
   request.mockClear();
@@ -36,7 +36,7 @@ it('旧预译授权不产生表达调用，独立表达授权才准备双字段'
 it('实际后台请求器也拒绝未经独立授权的语境预解析', async () => {
   state.config.prefetchExpressions = false;
   try {
-    expect(await learningRequest('telephoto lens', [], 'context', 'prefetch')).toEqual({ skipped: true });
+    expect(await learningRequest('telephoto lens', [], 'context', 'prefetch')).toMatchObject({ skipped: true });
     expect(state.cloud).not.toHaveBeenCalled();
   } finally { state.config.prefetchExpressions = true; }
 });

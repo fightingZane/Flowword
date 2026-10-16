@@ -36,12 +36,12 @@ export function splitTranslation(text: string): string[] {
   return chunks;   // 保留每个已捕获词语，只按空白分段，不截断或补造原句
 }
 
-export async function requestTranslation(text: string, fetcher: typeof fetch = fetch): Promise<string> {
+export async function requestTranslation(text: string, fetcher: typeof fetch = fetch, signal?: AbortSignal): Promise<string> {
   if (!validTranslationInput(text)) throw new Error('这段字幕过长，请选择较短片段后翻译');
   const url = new URL('/get', TRANSLATION_ORIGIN);
   url.searchParams.set('q', text);
   url.searchParams.set('langpair', 'en|zh-CN');
-  const response = await fetcher(url, { signal: AbortSignal.timeout(10000), credentials: 'omit', referrerPolicy: 'no-referrer' });
+  const response = await fetcher(url, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000), credentials: 'omit', referrerPolicy: 'no-referrer' });
   if (!response.ok) throw new Error(`翻译服务暂不可用（HTTP ${response.status}）`);
   return translationText(await response.json(), text);
 }

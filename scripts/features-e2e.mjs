@@ -166,6 +166,7 @@ try {
   await book.waitForFunction(() => !document.querySelector('.book-editor'));
   assert.equal(await book.locator('.book-card').count(), 0);
   await book.getByLabel('考点筛选').selectOption('写作表达');
+  await book.waitForFunction(() => document.querySelectorAll('.book-card').length === 1);
   assert.equal(await book.locator('.book-card').count(), 1);
   await book.evaluate(() => chrome.runtime.sendMessage({ type: 'FLOWWORD_BOOK_SAVE', entry: {
     kind: 'word', text: 'standpoint', translation: '观点；立场', partOfSpeech: '名词', examTags: ['写作表达'], tags: ['新加入'], contexts: [] } }));

@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ send: vi.fn() }));
 vi.mock('wxt/browser', () => ({ browser: { runtime: { sendMessage: mocks.send } } }));
 import { prefetchItems } from '../src/adapters/html5-subtitles';
 import { assembleSentence } from '../src/core/sentence';
-import { enrichLearning, learningContext } from '../src/services/learning';
+import { enrichLearning, learningContext, requestLearningMessage } from '../src/services/learning';
 const context = { text: 'a telephoto lens', segments: [], selected: {text:'a telephoto lens',start:0,end:3,source:'generic-track',language:'en'}, targetTime:1, learning: { status: 'loading', candidates: [] } } as unknown as SentenceContext;
 describe('整句优先与取消旧结果', () => {
   it('表达仍在处理时已经展示整句译文', async () => {
@@ -61,4 +61,24 @@ it('表达失败不抹整句成功译文', async () => {
   mocks.send.mockImplementation((message) => Promise.resolve(message.type === 'FLOWWORD_PROVIDER_PUBLIC' ? { ok: true, mode: 'cloud', prefetch: false } : message.type === 'FLOWWORD_TRANSLATE' ? { ok: true, translation: '一个长焦镜头', provider: 'cloud' } : { ok: false, error: 'mock failure' }));
   const result = await enrichLearning(context, new AbortController().signal);
   expect(result.learning?.status).toBe('ready'); expect(result.learning?.translation).toBe('一个长焦镜头'); expect(result.learning?.contextStatus).toBe('error');
+});
+
+it('只重试语境不重请求成功译文也不触发预译', async () => {
+  mocks.send.mockImplementation((message) => Promise.resolve(message.type === 'FLOWWORD_PROVIDER_PUBLIC' ? { ok: true, mode: 'cloud', prefetch: true } : { ok: true, expressions: [], cached: true, elapsedMs: 3 }));
+  mocks.send.mockClear();
+  const previous = { ...context, learning: { ...context.learning!, status: 'ready' as const, translation: '保留成功译文', elapsedMs: 123, translationState: 'ready' as const } };
+  const result = await enrichLearning(previous, new AbortController().signal, undefined, 'context');
+  expect(result.learning?.translation).toBe('保留成功译文'); expect(result.learning?.status).toBe('ready'); expect(result.learning?.elapsedMs).toBe(123);
+  expect(mocks.send.mock.calls.map((call) => call[0].type)).toEqual(['FLOWWORD_PROVIDER_PUBLIC', 'FLOWWORD_CONTEXT']);
+  expect(result.learning?.contextCached).toBe(true);
+});
+
+it('取消正在等待的RPC会发送匹配requestId取消消息', async () => {
+  let finish = (value: unknown) => {};
+  const waiting = new Promise((resolve) => { finish = resolve; });
+  mocks.send.mockClear(); mocks.send.mockImplementation((message) => message.type === 'FLOWWORD_CANCEL' ? Promise.resolve({ ok: true }) : waiting);
+  const abort = new AbortController(); const operation = requestLearningMessage({ type: 'FLOWWORD_TRANSLATE', sentence: 'test' }, abort.signal);
+  const requestId = mocks.send.mock.calls[0]![0].requestId;
+  abort.abort(); expect(mocks.send.mock.calls[1]![0]).toEqual({ type: 'FLOWWORD_CANCEL', requestId });
+  finish({ ok: false, cancelled: true }); await operation;
 });

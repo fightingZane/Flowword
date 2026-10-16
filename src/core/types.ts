@@ -18,6 +18,7 @@ export interface SubtitleSnapshot {
   videoKey: string;
   title: string;
   url: string;
+  thumbnail?: string;
 }
 
 export interface SentenceContext extends SubtitleSnapshot {
@@ -27,6 +28,11 @@ export interface SentenceContext extends SubtitleSnapshot {
     status: 'disabled' | 'loading' | 'ready' | 'error';
     translation?: string;
     segmented?: boolean;
+    cached?: boolean;
+    elapsedMs?: number;
+    translationState?: 'queued' | 'requesting' | 'cached' | 'ready' | 'error';
+    contextCached?: boolean;
+    contextElapsedMs?: number;
     error?: string;
     provider?: string;
     expressions?: { text: string; meaning: string; partOfSpeech: string; kind: 'word' | 'phrase'; reason: string }[];
@@ -83,8 +89,35 @@ export interface WordbookEntry {
   tags: string[];
   createdAt: number;
   updatedAt: number;
-  contexts: { sentence: string; url: string; time: number; title?: string; videoKey?: string; end?: number; translation?: string }[];
+  status?: LearningStatus;
+  review?: ReviewState;
+  contexts: { sentence: string; url: string; time: number; title?: string; videoKey?: string; end?: number; translation?: string; thumbnail?: string }[];
 }
+
+export type LearningStatus = 'new' | 'learning' | 'mastered';
+export type ReviewGrade = 'forgot' | 'uncertain' | 'remember';
+export interface ReviewState {
+  dueAt: number;
+  lastReviewedAt?: number;
+  intervalDays: number;
+  repetitions: number;
+  lapses: number;
+  lastGrade?: ReviewGrade;
+}
+export interface EntryQuery {
+  search?: string;
+  kind?: WordbookEntry['kind'] | '';
+  part?: string;
+  exam?: string;
+  tag?: string;
+  status?: LearningStatus | '';
+  videoId?: string;
+  sort?: 'recent' | 'alphabet' | 'kind' | 'time';
+  offset?: number;
+  limit?: number;
+}
+export interface EntryPage { entries: WordbookEntry[]; total: number; offset: number; limit: number }
+export interface EntryPatch { partOfSpeech?: string; examTags?: string[]; tags?: string[]; status?: LearningStatus }
 
 // 播放接口仅操作适配器选中的主视频，测试可以替换接口验证竞态
 export interface VideoHandle {

@@ -1,18 +1,31 @@
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { STORAGE } from '../src/storage/settings';
-import { effectiveProvider, learningRequest, prefetchLearning } from '../src/services/learning-background';
-import { allEntries, deleteEntry, saveEntry } from '../src/storage/wordbook';
+import { effectiveProvider, cancelAllLearningRequests } from '../src/services/learning-background';
+import { handleWordbookMessage } from '../src/services/wordbook-messages';
+import { handleTranslationMessage, cancelTranslationOwner } from '../src/services/translation-messages';
+import { handleSettingsAccess, clearSettingsGrants, isSettingsFrameGranted } from '../src/services/settings-access';
+import { handleSourceReplay, deliverPendingSourceReplay } from '../src/services/source-replay';
 
 export default defineBackground(() => {
-  let prefetchQueue = Promise.resolve();
   browser.runtime.onMessage.addListener((message, sender) => {
     const internal = sender.id === browser.runtime.id && ((/^https?:\/\//.test(sender.url ?? '')) || sender.url?.startsWith(browser.runtime.getURL('/')));
     if (!internal || !message || typeof message !== 'object') return;
     return (async () => {
       try {
         const extensionPage = sender.url?.startsWith(browser.runtime.getURL('/')) === true;
+        const access = await handleSettingsAccess(message, sender);
+        if (access !== undefined) return access;
+        if (extensionPage && !await isSettingsFrameGranted(sender)) return { ok: false, error: '请从悬浮球打开配置框' };
+        const source = await handleSourceReplay(message, sender);
+        if (source !== undefined) return source;
+        const translated = await handleTranslationMessage(message, sender);
+        if (translated !== undefined) return translated;
+        const book = await handleWordbookMessage(message, sender);
+        if (book !== undefined) return book;
+
         if (message.type === 'FLOWWORD_PROVIDER_CHANGED' && extensionPage) {
+          cancelAllLearningRequests();
           const config = await effectiveProvider();
           const publicConfig = { mode: config.mode, model: config.model, prefetch: config.prefetch, prefetchExpressions: config.prefetchExpressions === true, configured: config.mode !== 'cloud' || !!config.apiKey };
           for (const tab of await browser.tabs.query({})) if (tab.id !== undefined) void browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_PROVIDER_CHANGED', ...publicConfig }).catch(() => {});
@@ -23,34 +36,6 @@ export default defineBackground(() => {
           return { ok: true, mode: config.mode, model: config.model, prefetch: config.prefetch, prefetchExpressions: config.prefetchExpressions === true, configured: config.mode !== 'cloud' || !!config.apiKey };
         }
         if (message.type === 'FLOWWORD_SETTINGS_OPEN') { await browser.tabs.create({ url: browser.runtime.getURL('/settings.html') }); return { ok: true }; }
-        if (message.type === 'FLOWWORD_TRANSLATE' || message.type === 'FLOWWORD_CONTEXT') {
-          const context = Array.isArray(message.context) ? message.context.filter((value: unknown): value is string => typeof value === 'string' && value.length <= 2000).slice(0, 2) : [];
-          return { ok: true, ...await learningRequest(message.sentence, context, message.type === 'FLOWWORD_CONTEXT' ? 'context' : 'translate') as object };
-        }
-        if (message.type === 'FLOWWORD_PREFETCH') {
-          const config = await effectiveProvider();
-          if (!config.prefetch || config.mode !== 'cloud') return { ok: true, skipped: true };
-          const rawItems = Array.isArray(message.items) ? message.items : Array.isArray(message.sentences) ? message.sentences.map((sentence: unknown) => ({ sentence, context: [] })) : [];
-          const items: { sentence: string; context: string[] }[] = [];
-          for (const item of rawItems.slice(0, 2)) {
-            if (typeof item?.sentence !== 'string' || !item.sentence.trim() || item.sentence.length > 2000) continue;
-            const context: string[] = Array.isArray(item.context) ? item.context.filter((value: unknown): value is string => typeof value === 'string' && value.length <= 2000).slice(0, 2) : [];
-            items.push({ sentence: item.sentence, context });
-          }
-          const budgetKey = `prefetch:${sender.tab?.id ?? 'extension'}`;
-          const reservation = prefetchQueue.then(async () => {
-            const stored = await browser.storage.session.get(budgetKey);
-            const used = Number(stored[budgetKey] || 0);
-            const reserved = items.slice(0, Math.max(0, 20-used));
-            await browser.storage.session.set({ [budgetKey]: used + reserved.length });
-            return reserved;
-          });
-          prefetchQueue = reservation.then(() => {}, () => {});
-          const reserved = await reservation;
-          const results: object[] = [];
-          for (const item of reserved) results.push(await prefetchLearning(item.sentence, item.context, config.prefetchExpressions === true));
-          return { ok: true, results };
-        }
         if (message.type === 'FLOWWORD_ENABLE_SITE' && extensionPage) {
           const origin = new URL(message.origin).origin;
           if (!/^https?:/.test(origin) || !await browser.permissions.contains({ origins: [origin + '/*'] })) throw new Error('请先通过浏览器授权该网站');
@@ -60,15 +45,6 @@ export default defineBackground(() => {
           if (!registered.length) await browser.scripting.registerContentScripts([{ id, matches: [origin + '/*'], js: ['content-scripts/flowword.js'], runAt: 'document_idle', persistAcrossSessions: true }]);
           return { ok: true };
         }
-        if (message.type === 'FLOWWORD_BOOK_SAVE') {
-          const entry = await saveEntry(message.entry, typeof message.replaceId === 'string' ? message.replaceId : undefined);
-          void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_CHANGED' }).catch(() => {});
-          return { ok: true, entry };
-        }
-        if (message.type === 'FLOWWORD_BOOK_LIST') return { ok: true, entries: await allEntries() };
-        if (message.type === 'FLOWWORD_BOOK_DELETE' && typeof message.id === 'string') {
-          await deleteEntry(message.id); void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_CHANGED' }).catch(() => {}); return { ok: true };
-        }
         if (message.type === 'FLOWWORD_BOOK_OPEN') { await browser.tabs.create({ url: browser.runtime.getURL('/wordbook.html') }); return { ok: true }; }
         return { ok: false, error: '未知操作' };
       } catch (error) { return { ok: false, error: error instanceof Error ? error.message : '操作失败，请重试' }; }
@@ -77,6 +53,7 @@ export default defineBackground(() => {
   browser.permissions.onRemoved.addListener((removed) => {
     void (async () => {
       if (!removed.origins?.length) return;
+      cancelAllLearningRequests();
       const registered = await browser.scripting.getRegisteredContentScripts();
       const checks = await Promise.all(registered.filter((script) => script.id.startsWith('flowword-site-')).map(async (script) => ({ script, allowed: await browser.permissions.contains({ origins: script.matches ?? [] }) })));
       const revoke = checks.filter((item) => !item.allowed).map((item) => item.script);
@@ -86,6 +63,8 @@ export default defineBackground(() => {
       for (const tab of await browser.tabs.query({})) if (tab.id !== undefined) void browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_SITE_REVOKED', origins: revokedMatches }).catch(() => {});
     })().catch(() => {});
   });   // 只撤销已注册网站脚本，接口授权不会被误当成视频站授权
+  browser.tabs.onRemoved.addListener((tabId) => { cancelTranslationOwner(tabId); void clearSettingsGrants(tabId); });
+  browser.tabs.onUpdated.addListener((tabId, changed) => { if (changed.status === 'complete') void deliverPendingSourceReplay(tabId); });
   browser.commands.onCommand.addListener((command) => {
     void (async () => {
       const [tab] = await browser.tabs.query({ active: true, currentWindow: true });

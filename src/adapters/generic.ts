@@ -74,6 +74,14 @@ export class GenericVideoController implements VideoPort {
   }   // 恢复播放仍需同一元素、页面、媒体源和暂停时间，避免旧页面操作新视频
 }
 
+// pageVideoThumbnail 读取video已有封面或当前页封面元数据，不额外请求页面或浏览历史
+// 只接受可公开加载的HTTP图片地址，缺失时由词本使用本地占位
+function pageVideoThumbnail(video: HTMLVideoElement): string | undefined {
+  const candidate = video.poster || document.querySelector<HTMLMetaElement>('meta[property="og:image"]')?.content;
+  if (!candidate) return;
+  try { const url = new URL(candidate, location.href); if (['https:', 'http:'].includes(url.protocol) && !url.username && !url.password) return url.href; } catch { return; }
+}
+
 export class GenericSubtitleAdapter implements SubtitlePort {
   readonly cache = new SubtitleCache();
   private video: HTMLVideoElement | null = null;
@@ -112,7 +120,7 @@ export class GenericSubtitleAdapter implements SubtitlePort {
     const selected = segments.findLast((item) => item.start <= targetTime && item.end >= targetTime) ?? this.cache.select(targetTime);
     if (!selected) throw new Error('这个网站没有可读取的英文字幕轨道，请启用 English 字幕；页面自绘字幕需专用网站适配');
     return { selected: { ...selected }, segments, capturedTime: handle.time, targetTime, offset, videoKey: handle.key,
-      title: document.title, url: location.href };
+      title: document.title, url: location.href, thumbnail: pageVideoThumbnail(video) };
   }
 
   // previous 意为取得上一条字幕，context 给出当前原句及视频身份

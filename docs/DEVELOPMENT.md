@@ -46,10 +46,12 @@ npm run zip               # 生成 .output/flowword-版本号-chrome.zip
 
 ## 发布整理脚本的边界
 
-普通源码使用 build，ZIP 分发使用 zip。package 脚本主要整理本机 release，并复制一组验证截图和历史报告；新克隆仓库尚无全部证据时会因缺文件失败。这是已记录的维护改进项，不要求普通使用者先收集历史截图。
+普通源码使用 build，ZIP 分发使用 zip。package 脚本主要整理本机 release，并复制一组验证截图和历史报告；缺失证据会在evidence-manifest.json中逐项标记，不当作已验证；普通使用者无需收集历史截图。
 
 ## 文档规范
 
 README 描述当前能力，不把计划写成已完成。CHANGELOG 记录版本变化，TEST_REPORT 记录实测范围与限制。实现细节放在 docs/，历史修改按版本归入 docs/changes/。
 
 当前没有新增许可证或云端同步功能。发布源码不等于同步用户浏览器内的收藏和 API 配置。
+
+0.6完整本地验收执行npm run verify，包含事务单元测试、新词本7场景和设置安全8场景；网络均为模拟，不调用用户实际付费模型。

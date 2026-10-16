@@ -20,6 +20,20 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+it('单独重试表达保留已成功译文，不重新暂停或采样视频', async () => {
+  const { video, subtitles, snapshot, handle } = setup();
+  const original = { ...assembleSentence(snapshot), learning: { status: 'ready' as const, translation: '已有成功译文', candidates: [], contextStatus: 'error' as const, contextError: '暂时失败' } };
+  const enrich = vi.fn(async (context: SentenceContext, _signal: AbortSignal, _emit?: (context: SentenceContext) => void, task?: string) => task === 'context' ? { ...context, learning: { ...context.learning!, contextStatus: 'ready' as const, contextError: undefined } } : context);
+  const controller = new InteractionController(video, subtitles, async () => original, 2500, enrich);
+  await controller.capture();
+  await controller.retryLearning('context');
+  expect(enrich.mock.calls[1]?.[3]).toBe('context');
+  expect(controller.getSnapshot().context?.learning).toMatchObject({ translation: '已有成功译文', status: 'ready', contextStatus: 'ready' });
+  expect(handle.pause).toHaveBeenCalledOnce();
+  expect(subtitles.capture).toHaveBeenCalledOnce();
+  controller.dispose();
+});
+
 describe('暂停归属和显式状态机', () => {
   it('整句可提前发布，关闭后迟到的表达解析不能重开面板', async () => {
     const { video, subtitles, snapshot } = setup();
@@ -183,4 +197,16 @@ describe('暂停归属和显式状态机', () => {
     expect(controller.getSnapshot().error).toContain('播放按钮');
     controller.dispose();
   });
+});
+
+it('收藏来源的本地follow不调用模型、不暂停或重新采样且不残留翻译中状态', async () => {
+  const { video, subtitles, snapshot, handle } = setup();
+  const enrich = vi.fn(async (context: SentenceContext) => context);
+  const process = vi.fn(async () => ({ ...assembleSentence(snapshot), learning: { status: 'loading' as const, candidates: [] } }));
+  const controller = new InteractionController(video, subtitles, process, 2500, enrich);
+  await controller.follow(snapshot, true);
+  expect(enrich).not.toHaveBeenCalled(); expect(handle.pause).not.toHaveBeenCalled(); expect(subtitles.capture).not.toHaveBeenCalled();
+  expect(controller.getSnapshot().phase).toBe('READY');
+  expect(controller.getSnapshot().context?.learning?.status).not.toBe('loading');
+  controller.dispose();
 });

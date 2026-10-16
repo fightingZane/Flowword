@@ -1,0 +1,19 @@
+.fw-review { --review-paper: var(--book-card, var(--fw-paper)); --review-ink: var(--book-text, var(--fw-ink)); --review-muted: var(--book-muted, var(--fw-muted)); --review-line: var(--book-border, var(--fw-line)); --review-wash: var(--book-bg, var(--fw-wash)); color: var(--review-ink); font: inherit; }
+.fw-review-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.fw-review h2 { margin: 0; font-size: 1.2em; }
+.fw-review-header p, .fw-review-note { margin: 5px 0 0; color: var(--review-muted); font-size: .8em; line-height: 1.6; }
+.fw-review button { color: var(--review-ink); background: var(--review-wash); border: 1px solid var(--review-line); border-radius: 8px; padding: 7px 11px; cursor: pointer; font: inherit; font-size: .85em; }
+.fw-review button:disabled { opacity: .5; cursor: default; }
+.fw-review-progress { display: flex; justify-content: space-between; gap: 8px; color: var(--review-muted); font-size: .75em; margin-bottom: 12px; }
+.fw-review-card { padding: 20px; border: 1px solid var(--review-line); background: var(--review-paper); border-radius: 13px; }
+.fw-review-kind { font-size: .75em; color: var(--review-muted); }
+.fw-review h3 { font: 1.45em/1.45 Georgia, serif; margin: 10px 0 14px; overflow-wrap: anywhere; }
+.fw-review-sentence { font-size: 1em; line-height: 1.65; overflow-wrap: anywhere; }
+.fw-review-listen { margin: 0 0 12px; }
+.fw-review-reveal { width: 100%; margin-top: 12px; }
+.fw-review-answer { border-top: 1px solid var(--review-line); padding-top: 16px; margin-top: 10px; line-height: 1.7; overflow-wrap: anywhere; }
+.fw-review-answer p { margin: 7px 0 0; color: var(--review-muted); font-size: .9em; }
+.fw-review-grades { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+.fw-review-grades button:last-child { font-weight: 650; }
+.fw-review-error { color: #cd906c; line-height: 1.6; font-size: .85em; }
+.fw-review-empty { text-align: center; padding: 30px 8px; color: var(--review-muted); }

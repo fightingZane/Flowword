@@ -25,3 +25,8 @@
 - [0.5.1 修改说明](changes/0.5.1.md)
 
 根目录保留 INSTALL.md 和 TEST_REPORT.md，因为现有发布整理脚本读取这两个文件。应用入口、源码、脚本和浏览器已加载目录保持原位。
+
+- [0.6 修改说明与验证方式](changes/0.6.md)
+
+- [0.6.1 修改说明](changes/0.6.1.md)
+- [网页划词翻译待审核方案](plans/web-selection-translation.md)

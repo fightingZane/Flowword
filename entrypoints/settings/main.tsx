@@ -3,9 +3,17 @@ import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
 import { DEFAULT_PROVIDER, readProvider, saveProvider, validateProvider, clearTranslationCache, type ProviderConfig } from '../../src/storage/provider';
 import { STORAGE } from '../../src/storage/settings';
+import { requestCloud } from '../../src/services/cloud';
 import './style.css';
 const embedded = new URLSearchParams(location.search).get('embedded') === '1';
 document.documentElement.dataset.embedded = embedded ? 'true' : 'false';
+// checkAccess 校验当前设置访问，无参数，顶层扩展页可用，嵌入页必须持有后台绑定的会话
+async function checkAccess(): Promise<void> {
+  if (window.top === window) return;
+  const token = new URLSearchParams(location.search).get('token');
+  const result = await browser.runtime.sendMessage({ type: 'FLOWWORD_SETTINGS_EMBED_CHECK', token });
+  if (!result?.ok) throw new Error(result?.error || '请从视频悬浮球打开模型设置');
+}
 // Settings 是独立扩展配置页，无参数，从扩展数据库读取服务配置
 // 顶层页面或嵌入框都保持chrome-extension来源，不把密钥交给父页面或postMessage
 function Settings() {
@@ -32,6 +40,7 @@ function Settings() {
   async function save() {
     setBusy(true); setNotice('');
     try {
+      await checkAccess();
       const sameEndpoint = new URL(config.endpoint).href === new URL(savedSecret.current.endpoint || config.endpoint).href;
       if (config.mode === 'cloud' && !config.apiKey.trim() && savedSecret.current.apiKey && !sameEndpoint) throw new Error('修改接口地址后请重新输入 API Key，避免把旧密钥发送给其他服务');
       const value = validateProvider({ ...config, apiKey: config.apiKey.trim() || (sameEndpoint ? savedSecret.current.apiKey : '') });
@@ -51,6 +60,7 @@ function Settings() {
   async function clearSecret() {
     setBusy(true);
     try {
+      await checkAccess();
       const stored = await readProvider() ?? DEFAULT_PROVIDER;
       const cleared: ProviderConfig = { ...stored, mode: 'off', apiKey: '' };
       await saveProvider(cleared); await browser.storage.local.set({ [STORAGE.onlineTranslation]: false });
@@ -58,11 +68,41 @@ function Settings() {
     } catch { setNotice('清除失败，请重试'); }
     finally { setBusy(false); }
   }   // 从已保存配置清除，未保存的错误地址不能阻止删除密钥
+  // testConnection 测试表单中已授权模型，无参数，使用自编短句且不写学习缓存，用户点击才发请求
+  // 空密钥只在同一接口复用本机配置，结果不证明所有视频译文质量
+  async function testConnection() {
+    setBusy(true); setNotice('正在测试连接…');
+    const start = performance.now();
+    try {
+      await checkAccess();
+      const sameEndpoint = new URL(config.endpoint).href === new URL(savedSecret.current.endpoint || config.endpoint).href;
+      const value = validateProvider({ ...config, apiKey: config.apiKey.trim() || (sameEndpoint ? savedSecret.current.apiKey : '') });
+      if (value.mode !== 'cloud') throw new Error('连接测试仅用于云端模型，请先选择云端服务');
+      const origin = new URL(value.endpoint).origin + '/*';
+      if (!await browser.permissions.contains({ origins: [origin] }) && !await browser.permissions.request({ origins: [origin] })) throw new Error('接口访问未授权，尚未发出测试请求');
+      await requestCloud(value, 'This is a connection test.', [], 'translate');
+      setNotice(`连接成功 · ${value.model} · ${Math.round(performance.now() - start)} ms；未修改已保存配置`);
+    } catch (failure) {
+      const message = failure instanceof Error ? failure.message : '网络连接失败';
+      setNotice(/HTTP 401|HTTP 403/.test(message) ? '认证或权限失败，请检查 API Key 和模型访问权限' : /HTTP 429/.test(message) ? '服务限流或额度不足，请检查供应商账户' : /HTTP 404/.test(message) ? '接口或模型不存在，请检查完整地址和模型名称' : message);
+    } finally { setBusy(false); }
+  }
   return <main><header>FlowWord · 翻译服务</header><h1>让翻译理解当前语境</h1><p>{embedded ? "密钥仅保存在本机扩展中，向所选服务发送字幕；填写并保存后启用，调用可能收费" : "密钥只保存于本机扩展数据库，仅向你授权的接口发送。云端收到当前字幕与最多两句相邻字幕，不发送视频网址。默认预填 DeepSeek，填写密钥并保存才启用。服务可能收费，请确认接口提供方可信。"}</p>
     <p className="active-service" aria-live="polite">{activeService}</p><label>服务<select disabled={!configReady} aria-label="服务" value={config.mode} onChange={(event) => update({ mode: event.target.value as ProviderConfig['mode'] })}><option value="off">关闭联网</option><option value="cloud">云端模型 · Chat Completions 兼容接口</option><option value="mymemory">MyMemory · 整句参考翻译，无语境词义</option></select></label>
     {config.mode === 'cloud' && <><label>HTTPS 接口完整地址<input aria-label="HTTPS 接口完整地址" value={config.endpoint} onChange={(event) => update({ endpoint: event.target.value })}/></label><label>模型名称<input aria-label="模型名称" value={config.model} onChange={(event) => update({ model: event.target.value })} placeholder="提供方支持的模型名称"/></label><label>API Key<input aria-label="API Key" type="password" autoComplete="off" placeholder={hasSavedKey ? "已配置 · 留空保留，输入则替换" : "请输入 API Key"} value={config.apiKey} onChange={(event) => update({ apiKey: event.target.value })}/></label><label className="check"><input type="checkbox" checked={config.prefetch} onChange={(event) => update({ prefetch: event.target.checked })}/>允许播放中预译已出现的当前字幕及已加载邻句，每次最多两句，每标签页会话最多二十句，可能增加费用</label><label className="check"><input type="checkbox" aria-label="提前准备词组释义" disabled={!config.prefetch} checked={config.prefetchExpressions === true} onChange={(event) => update({ prefetchExpressions: event.target.checked })}/>提前准备词组释义：每个新句最多额外一次模型调用，已准备时点开可同时看到整句和词组</label><p>先开启播放预译，再按需开启词组预解析；默认沿用旧版只预译整句。首次新字幕或未完成的请求仍可能等待</p></>}
     {config.mode === 'mymemory' && <p>MyMemory 匿名额度有限，可能保存文本并交给第三方机译处理。不会自动降级到此服务，也不逐词查询。</p>}
     <section><h2>键盘快捷键</h2>{shortcuts.filter((item) => item.name?.startsWith('flowword-')).map((item) => <p key={item.name}>{item.name === 'flowword-toggle' ? '暂停 / 恢复' : '重听当前句'}：{item.shortcut || '未绑定或组合键冲突，请在浏览器中设置'}</p>)}</section>
-    <div className="buttons"><button onClick={() => void save()} disabled={busy || !configReady}>授权接口并保存</button><button disabled={busy} onClick={() => void clearSecret()}>清除密钥</button><button onClick={() => void clearTranslationCache().then(() => setNotice('本地译文缓存已清除')).catch(() => setNotice('缓存清除失败，请重试'))}>清除译文缓存</button><button onClick={() => void browser.tabs.create({ url: 'chrome://extensions/shortcuts' })}>修改键盘快捷键</button></div><p role="status">{notice}</p></main>;
+    <div className="buttons"><button onClick={() => void save()} disabled={busy || !configReady}>授权接口并保存</button><button disabled={busy || !configReady} onClick={() => void testConnection()}>测试连接</button><button disabled={busy} onClick={() => void clearSecret()}>清除密钥</button><button onClick={() => void clearTranslationCache().then(() => setNotice('本地译文缓存已清除')).catch(() => setNotice('缓存清除失败，请重试'))}>清除译文缓存</button><button onClick={() => void browser.tabs.create({ url: 'chrome://extensions/shortcuts' })}>修改键盘快捷键</button></div><p role="status">{notice}</p></main>;
 }
-createRoot(document.getElementById('root')!).render(<Settings/>);
+// SettingsAccess 先校验嵌入来源再挂载秘密配置，无参数，拒绝时不读取本机模型配置
+function SettingsAccess() {
+  const [allowed, setAllowed] = useState(false);
+  const [failure, setFailure] = useState('');
+  useEffect(() => {
+    let active = true;
+    void checkAccess().then(() => { if (active) setAllowed(true); }).catch((error) => { if (active) setFailure(error instanceof Error ? error.message : '访问校验失败'); });
+    return () => { active = false; };
+  }, []);
+  return allowed ? <Settings /> : <main><p role="status">{failure || '正在校验设置入口…'}</p></main>;
+}
+createRoot(document.getElementById('root')!).render(<SettingsAccess/>);

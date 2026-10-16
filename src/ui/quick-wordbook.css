@@ -14,3 +14,7 @@
 .fw-quick-book-message { color: var(--fw-muted); padding: 20px 0; font-size: calc(var(--fw-font, 16px) * .87); }
 .fw-quick-book-footer { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 3px; background: var(--fw-paper); }
 .fw-quick-book-footer button { padding: 6px 8px; color: var(--fw-ink); background: var(--fw-wash); border-radius: 6px; font-size: calc(var(--fw-font, 16px) * .8); }
+.fw-quick-book-review { padding: 9px; margin-bottom: 13px; background: var(--fw-wash); border: 1px solid var(--fw-line) !important; border-radius: 8px; text-align: left; font-size: .85em !important; }
+.fw-quick-book-pages { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 12px; font-size: .8em; color: var(--fw-muted); }
+.fw-quick-book-pages button { background: var(--fw-wash); border-radius: 6px; padding: 5px 8px; }
+.fw-quick-book-source { display: block; max-width: 100%; margin-top: 7px; padding: 3px 0; font-size: .72em !important; color: var(--fw-muted) !important; background: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }

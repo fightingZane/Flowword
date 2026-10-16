@@ -7,10 +7,11 @@ import { GenericSubtitleAdapter, GenericVideoController } from '../src/adapters/
 import { createDomReplayBoundary, latestObservedRange, prefetchItems, readTrackSegments, selectEnglishTrack, subtitleTimeline, type PrefetchItem } from '../src/adapters/html5-subtitles';
 import { InteractionController } from '../src/core/interaction-controller';
 import { ReplayController } from '../src/core/replay-controller';
-import { assembleSentence } from '../src/core/sentence';
+import { normalizeReplaySource, sourceMatches } from '../src/core/source-replay';
+import { assembleSentence, normalizeText } from '../src/core/sentence';
 import { analyzeVocabulary } from '../src/core/vocabulary';
 import { getCuratedMeaning } from '../src/core/curated-meanings';
-import { enrichLearning } from '../src/services/learning';
+import { enrichLearning, requestLearningMessage } from '../src/services/learning';
 import type { PageStatus, SubtitlePort, SubtitleSnapshot } from '../src/core/types';
 import { readSettings, STORAGE, writeAppearance, writeSetting } from '../src/storage/settings';
 import { FloatingApp } from '../src/ui/FloatingApp';
@@ -44,7 +45,8 @@ export default defineContentScript({
     let lastPrefetch = 0;
     let stableCaption = '';
     let stableSince = 0;
-    const attemptedPrefetch = new Set<string>();
+    const attemptedPrefetch = new Map<string, { attempts: number; nextAt: number; complete: boolean }>();
+    let prefetchAbort: AbortController | undefined;
 
     // nearbySnapshot 意为裁剪真实邻近字幕，snapshot 是平台适配器捕获结果
     // YouTube 原生轨道补入已加载下句，DOM 不补造未来，最终只留下少量邻近片段
@@ -71,6 +73,8 @@ export default defineContentScript({
     let root: Root | undefined;
     let mounted = false;
     let currentVideoKey = pageKey();
+    let sourceReadyKey = '';
+    let sourceReplayPending = 0;
     let boundVideo: HTMLVideoElement | null = null;
     const mediaEvents = ['play', 'seeking', 'emptied', 'loadstart', 'ended'];
 
@@ -100,6 +104,57 @@ export default defineContentScript({
         snapshot.selected.source === 'youtube-dom' ? createDomReplayBoundary(snapshot, readVisibleYouTubeCaption, () => video.currentTime) : undefined);
       if (context && replay.active) controller.rebaseHandle();   // 句末暂停属于用户主动要求的重听，新归属允许显式继续
     }
+
+    // seekSourceVideo 定位video的真实time，metadata和seeked必须完成，超时或被其他跳转替换时拒绝操作
+    async function seekSourceVideo(video: HTMLVideoElement, time: number): Promise<void> {
+      if (video.readyState < 1) await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => { video.removeEventListener('loadedmetadata', ready); reject(new Error('视频尚未加载，已打开来源，请稍后重试')); }, 8000);
+        // ready 表示媒体信息可用，无参数，只用于当前定位等待
+        const ready = () => { clearTimeout(timer); resolve(); };
+        video.addEventListener('loadedmetadata', ready, { once: true });
+      });
+      if (!Number.isFinite(video.duration) || time >= video.duration) throw new Error('收藏时间超出当前视频范围');
+      video.pause();
+      if (Math.abs(video.currentTime - time) < 0.03) return;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => { video.removeEventListener('seeked', finished); reject(new Error('视频定位超时，请在来源页手动定位')); }, 8000);
+        // finished 核对真实跳转结果，无参数，用户跳到其他时间时不继续控制旧目标
+        const finished = () => { clearTimeout(timer); Math.abs(video.currentTime - time) < 0.25 ? resolve() : reject(new Error('定位已被其他跳转替换')); };
+        video.addEventListener('seeked', finished, { once: true }); video.currentTime = time;
+      });
+    }
+
+    // replaySource 重听value收藏来源，只在页面身份和实时字幕匹配时控制播放，不信任收藏的结束时间
+    async function replaySource(value: unknown): Promise<void> {
+      const source = normalizeReplaySource(value);
+      if (!settings.enabled || !sourceMatches(source, location.href, pageKey())) throw new Error('当前页面不是已授权的收藏视频来源');
+      const video = videos.current(); if (!video) throw new Error('来源播放器尚未就绪，请稍后重试');
+      sourceReplayPending++;
+      prefetchAbort?.abort(); prefetchRevision++; prefetchPending = false;
+      try {
+        following = false; replay.cancel(); controller.reset();
+        await seekSourceVideo(video, source.time);
+        if (ctx.isInvalid || videos.current() !== video || !sourceMatches(source, location.href, pageKey())) throw new Error('来源页面或视频已切换');
+        subtitles.sample();
+        let snapshot = subtitlePort.capture(videos.capture(), 0);
+        const expected = normalizeText(source.sentence);
+        if (snapshot.selected.source !== 'youtube-dom') {
+          const loaded = readTrackSegments(selectEnglishTrack(video), snapshot.selected.source === 'generic-track' ? 'generic-track' : 'text-track');
+          for (const selected of loaded.filter((cue) => cue.start >= source.time - 0.2 && cue.start <= source.time + 12)) {
+            const candidate = { ...snapshot, selected, segments: loaded, targetTime: selected.start };
+            if (normalizeText(assembleSentence(candidate).text) === expected) { snapshot = candidate; break; }
+          }
+        }
+        const actual = normalizeText(snapshot.selected.text);
+        if (!actual || !(expected === actual || expected.includes(actual) || normalizeText(assembleSentence(snapshot).text) === expected)) throw new Error('已定位来源，但当前字幕与收藏原句不匹配，请手动确认');
+        const key = snapshot.videoKey; const media = video.currentSrc;
+        void controller.follow(snapshot, true);
+        await replay.repeat(video, latestObservedRange(snapshot, subtitles.cache.all()), () => videos.current() === video && pageKey() === key && video.currentSrc === media,
+          () => { try { controller.adoptReplayPause(); } catch { controller.reset(); } },
+          snapshot.selected.source === 'youtube-dom' ? createDomReplayBoundary({ ...snapshot, selected: { ...snapshot.selected, text: expected } }, readVisibleYouTubeCaption, () => video.currentTime) : undefined);
+      } finally { sourceReplayPending--; }
+    }
+
 
     // startFollow 意为启用字幕播放跟随，无参数，由面板明确操作启动
     // 先检查主视频，再播放并进入跟随，不把后续云端译文速度当作视频暂停条件
@@ -131,7 +186,7 @@ export default defineContentScript({
     // 需要联网云模式和独立预译授权，DOM 稳定后只译已出现当前句，真实轨道可加下一句
     function prefetchTick() {
       const video = boundVideo;
-      if (!video || video.paused || !settings.onlineTranslation || provider.mode !== 'cloud' || !provider.prefetch || prefetchPending) return;
+      if (!video || video.paused || replay.active || sourceReplayPending > 0 || !settings.onlineTranslation || provider.mode !== 'cloud' || !provider.prefetch || prefetchPending) return;
       try {
         const snapshot = subtitlePort.capture(videos.capture(), settings.offset);
         const current = assembleSentence(snapshot);
@@ -141,13 +196,17 @@ export default defineContentScript({
         if (snapshot.selected.source === 'youtube-dom' && now - stableSince < 600 || now - lastPrefetch < 2000) return;
         const context = subtitleTimeline(snapshot, current).filter((item) => item.text !== current.text).slice(0, 2).map((item) => item.text);
         const items: PrefetchItem[] = [{ sentence: current.text, context }, ...prefetchItems(snapshot)];
-        const fresh = items.filter((item) => item.sentence.length <= 2000 && !attemptedPrefetch.has(JSON.stringify([provider.model, snapshot.videoKey, item]))).slice(0, 2);
+        const fresh = items.filter((item) => item.sentence.length <= 2000 && (() => { const record = attemptedPrefetch.get(JSON.stringify([provider.model, snapshot.videoKey, item])); return !record || !record.complete && record.attempts < 3 && now >= record.nextAt; })()).slice(0, 2);
         if (!fresh.length) return;
-        fresh.forEach((item) => attemptedPrefetch.add(JSON.stringify([provider.model, snapshot.videoKey, item])));
-        if (attemptedPrefetch.size > 100) attemptedPrefetch.delete(attemptedPrefetch.values().next().value!);
+        fresh.forEach((item) => { const key = JSON.stringify([provider.model, snapshot.videoKey, item]); const previous = attemptedPrefetch.get(key); attemptedPrefetch.set(key, { attempts: (previous?.attempts ?? 0) + 1, nextAt: now + 4000, complete: false }); });
+        if (attemptedPrefetch.size > 100) attemptedPrefetch.delete(attemptedPrefetch.keys().next().value!);
         lastPrefetch = now; prefetchPending = true;
         const revision = prefetchRevision;
-        void browser.runtime.sendMessage({ type: 'FLOWWORD_PREFETCH', items: fresh }).catch(() => {}).finally(() => {
+        prefetchAbort = new AbortController();
+        void requestLearningMessage({ type: 'FLOWWORD_PREFETCH', items: fresh }, prefetchAbort.signal).then((response) => {
+          if (revision !== prefetchRevision) return;
+          fresh.forEach((item) => { const key = JSON.stringify([provider.model, snapshot.videoKey, item]); const record = attemptedPrefetch.get(key); if (!record) return; const result = response?.results?.find((value: { text: string; complete?: boolean }) => value.text === item.sentence); record.complete = result?.complete === true; record.nextAt = Date.now() + Math.min(16000, record.attempts * 4000); });
+        }).catch(() => {}).finally(() => {
           if (revision === prefetchRevision) prefetchPending = false;
         });
       } catch { /* 不可读字幕不触发联网，不影响普通视频播放 */ }
@@ -202,6 +261,7 @@ export default defineContentScript({
       if (event?.type === 'play' && followOwnPlay === event.target && following) return;
       if (event?.type === 'play' && controller.getSnapshot().phase === 'RESUME') return;
       replay.cancel(); following = false; lastFollow = '';
+      prefetchAbort?.abort(); prefetchAbort = undefined;
       prefetchRevision++; prefetchPending = false; stableCaption = ''; attemptedPrefetch.clear();
       controller.reset();
       subtitles.reset();
@@ -244,6 +304,7 @@ export default defineContentScript({
       if (enabled && !mounted) { ui.mount(); mounted = true; reparent(); }
       if (!enabled && mounted) { mediaChanged(); ui.remove(); mounted = false; }
       bindVideo(enabled ? videos.current() : null);
+      if (enabled && boundVideo) { const readyKey = key + ':' + boundVideo.currentSrc; if (readyKey !== sourceReadyKey) { sourceReadyKey = readyKey; void browser.runtime.sendMessage({ type: 'FLOWWORD_SOURCE_READY' }).catch(() => {}); } }
       if (enabled) { subtitles.sample(); followTick(); prefetchTick(); }   // 关闭插件时不读取视频或字幕
     }
 
@@ -266,6 +327,17 @@ export default defineContentScript({
     // 返回安全状态或命令结果，撤权按自身 origin 筛选，不接受网页跨来源调用
     const messages = (message: unknown, sender: Browser.runtime.MessageSender): Promise<unknown> | undefined => {
       if (sender.id !== browser.runtime.id || !message || typeof message !== 'object' || !('type' in message)) return;
+      if ((message.type === 'FLOWWORD_SOURCE_PROBE' || message.type === 'FLOWWORD_SOURCE_REPLAY') && 'source' in message) {
+        return (async () => {
+          try {
+            const source = normalizeReplaySource(message.source);
+            const matches = settings.enabled && sourceMatches(source, location.href, pageKey());
+            if (message.type === 'FLOWWORD_SOURCE_PROBE') return { ok: true, matches };
+            if (!matches) return { ok: false, error: '当前页面不匹配收藏视频或插件未开启' };
+            await replaySource(source); return { ok: true, replaying: true };
+          } catch (error) { return { ok: false, error: error instanceof Error ? error.message : '来源重听失败' }; }
+        })();
+      }
       if (message.type === 'FLOWWORD_PING') return Promise.resolve({ type: 'FLOWWORD_STATUS', isVideoPage: Boolean(pageKey()), enabled: settings.enabled,
         phase: controller.getSnapshot().phase, version: browser.runtime.getManifest().version } satisfies PageStatus);
       if (message.type === 'FLOWWORD_PANEL_OPEN' && 'view' in message && (message.view === 'provider' || message.view === 'book')) {
@@ -273,7 +345,7 @@ export default defineContentScript({
         requestedPanel = { view: message.view, revision: (requestedPanel?.revision ?? 0) + 1 };
         render(); return Promise.resolve({ ok: true });
       }
-      if (message.type === 'FLOWWORD_PROVIDER_CHANGED') { attemptedPrefetch.clear(); void refreshProvider(); return Promise.resolve({ ok: true }); }
+      if (message.type === 'FLOWWORD_PROVIDER_CHANGED') { prefetchAbort?.abort(); attemptedPrefetch.clear(); void refreshProvider(); return Promise.resolve({ ok: true }); }
       if (message.type === 'FLOWWORD_SITE_REVOKED' && !youtube) {
         const revoked = 'origins' in message && Array.isArray(message.origins) && message.origins.includes(location.origin + '/*');
         if (revoked) ctx.abort();

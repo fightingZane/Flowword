@@ -4,6 +4,7 @@ import type { InteractionController } from '../core/interaction-controller';
 import type { Appearance, BallPosition, Point, Settings, WordbookEntry } from '../core/types';
 import { browser } from 'wxt/browser';
 import { QuickWordbook } from './QuickWordbook';
+import { EmbeddedSettings } from './EmbeddedSettings';
 import { ScrollArea } from './ScrollArea';
 import { NeighborLine } from './NeighborLine';
 import './quick-wordbook.css';
@@ -54,7 +55,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   const [secondaryView, setSecondaryView] = useState<'provider' | 'book' | null>(null);
   useEffect(() => { if (requestedPanel) { setSecondaryView(requestedPanel.view); setSettingsOpen(false); } }, [requestedPanel?.revision]);
   const [draft, setDraft] = useState<WordbookEntry | null>(null);
-  const [savedEntries, setSavedEntries] = useState<WordbookEntry[]>([]);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
   const savedRevision = useRef(0);
   const [expanded, setExpanded] = useState(false);
   const contextKey = `${state.context?.videoKey}:${state.context?.capturedTime}:${state.context?.text}`;
@@ -144,7 +145,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
     const range = observedSentenceRange(context);   // 与重听一致，拼接句从实际参与片段的句首溯源
     setDraft({ id: '', kind, text, lemma, translation, partOfSpeech, examTags: [], tags: [], createdAt: 0, updatedAt: 0,
       contexts: [{ sentence: context.text, url: context.url, time: range.start, end: range.end,
-        title: context.title, videoKey: context.videoKey, translation: context.learning?.translation }] });
+        title: context.title, videoKey: context.videoKey, thumbnail: context.thumbnail, translation: context.learning?.translation }] });
   }
 
   // save 将entry草稿交给扩展后台校验保存，成功后关闭表单，失败交回表单提示
@@ -152,30 +153,36 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
     const response = await browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_SAVE', entry });
     if (!response?.ok) throw new Error(response?.error || '保存失败');
     savedRevision.current += 1;   // 保存确认使更早发出的收藏列表失效
-    setSavedEntries((previous) => [...previous.filter((item) => item.id !== response.entry.id), response.entry]);
+    setSavedIds((previous) => [...new Set([...previous, response.entry.id])]);
     setDraft(null); flash('已加入本地单词本');
   }
 
   // saved 判断kind类型与原文或lemma是否已收藏，允许再次点击保存当前视频的新语境
   function saved(kind: WordbookEntry['kind'], text: string, lemma = text): boolean {
     const keys = [entryKey(kind, text), entryKey(kind, lemma)];
-    return savedEntries.some((entry) => keys.includes(entryKey(entry.kind, entry.text)) || keys.includes(entryKey(entry.kind, entry.lemma || entry.text)));
+    return keys.some((key) => savedIds.includes(key));
   }
 
+  const savedLookupIds = JSON.stringify([...new Set([
+    ...(state.context ? [entryKey('sentence', state.context.text)] : []),
+    ...(state.context?.learning?.expressions ?? []).map((item) => entryKey('phrase', item.text)),
+    ...(state.context?.learning?.candidates ?? []).flatMap((item) => [entryKey('word', item.text), entryKey('phrase', item.text), entryKey('word', item.lemma || item.text)]),
+  ])].slice(0, 100));
+
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || secondaryView || settingsOpen || !state.context) return;
     let active = true;
     // refresh 读取后台确认的收藏记录，无参数，打开面板或切回网页时同步删除与新增
     const refresh = () => {
       const revision = ++savedRevision.current;
-      void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_LIST' }).then((response) => {
-        if (active && revision === savedRevision.current && response?.ok && Array.isArray(response.entries)) setSavedEntries(response.entries);
+      void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_STATUS', ids: JSON.parse(savedLookupIds) }).then((response) => {
+        if (active && revision === savedRevision.current && response?.ok && Array.isArray(response.savedIds)) setSavedIds(response.savedIds);
       }).catch(() => {});
     };
     refresh();
     window.addEventListener('focus', refresh);
     return () => { active = false; window.removeEventListener('focus', refresh); };
-  }, [visible]);
+  }, [visible, secondaryView, settingsOpen, savedLookupIds]);
 
   const expressions = state.context?.learning?.expressions?.filter((item) => hasMeaning(item.meaning) && hasSourceSpan(state.context!.text, item.text)) ?? [];
   const candidates = state.context?.learning?.candidates.filter((item) => hasMeaning(item.translation || item.meaning) && hasSourceSpan(state.context!.text, item.text)) ?? [];
@@ -276,7 +283,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
       </header>
 
       <ScrollArea busy={busy}>
-        {secondaryView === 'provider' ? <iframe className="fw-provider-frame" src={browser.runtime.getURL('/settings.html') + '?embedded=1'} title="模型与快捷键设置" /> : secondaryView === 'book' ? <QuickWordbook onOpenFull={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })} /> : settingsOpen ? <SettingsPanel onProvider={() => { setSettingsOpen(false); setSecondaryView('provider'); }} settings={settings} onAppearance={onAppearance} onError={flash} onOnline={async (value) => {
+        {secondaryView === 'provider' ? <EmbeddedSettings /> : secondaryView === 'book' ? <QuickWordbook onOpenFull={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })} /> : settingsOpen ? <SettingsPanel onProvider={() => { setSettingsOpen(false); setSecondaryView('provider'); }} settings={settings} onAppearance={onAppearance} onError={flash} onOnline={async (value) => {
           await onOnlineTranslation(value);
           if (state.context) void controller.capture(settings.offset);
         }} /> : draft ? <SaveEntryForm draft={draft} onSave={save} onCancel={() => setDraft(null)} /> : <>
@@ -295,10 +302,11 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
               : state.context.learning.status === 'loading' ? <p className="fw-learning-note">正在准备这一句译文…</p>
               : state.context.learning.status === 'disabled' ? <p className="fw-learning-note">联网翻译尚未开启 <button type="button" onClick={() => setSettingsOpen(true)}>右键配置 / 开启翻译</button></p>
               : <p className="fw-learning-note" role="status">{state.context.learning.error || '暂没有可用译文'}</p>}
-            <div className="fw-translation-label">当前句译文 <span>{state.context.learning.provider || '参考翻译'}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
+            <div className="fw-translation-label">当前句译文 <span>{state.context.learning.cached ? '缓存命中' : state.context.learning.status === 'loading' ? '正在准备' : state.context.learning.status === 'error' ? '请求失败' : state.context.learning.provider || '参考翻译'}{state.context.learning.elapsedMs !== undefined ? ` · ${state.context.learning.elapsedMs} ms` : ''}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
           </div>}
           {state.context.learning?.provider === 'mymemory' && <p className="fw-context-note">MyMemory 参考机译 · 无语境分析 <button type="button" onClick={() => { setSecondaryView('provider'); setSettingsOpen(false); }}>配置语境模型 ↗</button></p>}
           {state.context.learning?.timeline?.filter((line) => line.start >= observedSentenceRange(state.context!).end).slice(0, 1).map((line) => <NeighborLine key={`${contextKey}:after:${line.start}`} line={line} current={state.context!.text} online={settings.onlineTranslation} label="下文" />)}
+          {state.context.learning?.status === 'error' && <button type="button" className="fw-retry" onClick={() => void controller.retryLearning('translate')}>重试整句翻译</button>}
           <div className="fw-current-actions">
             <button type="button" className="fw-primary" onClick={() => add(state.context!.text, 'sentence', state.context!.learning?.translation || '', state.context!.text, '句子')}>{saved('sentence', state.context.text) ? '已加入整句' : '收藏整句'}</button>
             {onRepeat && <button type="button" className="fw-retry" onClick={() => void onRepeat().catch((error) => flash(error instanceof Error ? error.message : '无法重听'))}>重听这一句 ↻</button>}
@@ -313,7 +321,8 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
               <p>{expression.meaning}</p><span className="fw-candidate-reason">{expression.reason}</span>
             </div>)}
             {state.context.learning.contextStatus === 'loading' && <p className="fw-learning-note">语境表达解析中…</p>}
-            {state.context.learning.contextError && <p className="fw-learning-note">{state.context.learning.contextError}</p>}
+            {state.context.learning.contextError && <p className="fw-learning-note">{state.context.learning.contextError} <button type="button" onClick={() => void controller.retryLearning('context')}>重试表达释义</button></p>}
+            {state.context.learning.contextCached && <p className="fw-context-note">表达释义 · 缓存命中</p>}
             {state.context.learning.provider === 'cloud' && <p className="fw-context-note">根据当前句与邻近字幕解释，模型结果仍需结合原文核对</p>}
             {state.context.learning.provider !== 'cloud' && !expressions.length && <>
             <p className="fw-context-note">{GENERAL_MEANING_NOTE}</p>

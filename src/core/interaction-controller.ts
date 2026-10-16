@@ -17,7 +17,7 @@ export class InteractionController {
     private readonly subtitles: SubtitlePort,
     private readonly process: SentenceProcessor = async (snapshot) => assembleSentence(snapshot),
     private readonly timeout = 2500,
-    private readonly enrich?: (context: SentenceContext, signal: AbortSignal, emit?: (context: SentenceContext) => void) => Promise<SentenceContext>,
+    private readonly enrich?: (context: SentenceContext, signal: AbortSignal, emit?: (context: SentenceContext) => void, task?: 'translate' | 'context' | 'both') => Promise<SentenceContext>,
   ) {}
 
   getSnapshot = (): InteractionState => this.state;
@@ -70,12 +70,12 @@ export class InteractionController {
   }
 
   // follow 表示跟随当前字幕，snapshot是正在播放的真实字幕快照
-  // 只在用户主动启用字幕跟随时调用，不暂停视频且旧结果不能覆盖新句
-  async follow(snapshot: SubtitleSnapshot): Promise<void> {
+  // localOnly用于收藏来源重听，跳过模型请求，不暂停视频且旧结果不能覆盖新句
+  async follow(snapshot: SubtitleSnapshot, localOnly = false): Promise<void> {
     if (this.state.context?.selected.start === snapshot.selected.start && this.state.context?.selected.text === snapshot.selected.text) return;
     const operation = this.cancel();
     this.pausedByUs = false; this.handle = null;
-    try { await this.analyze(snapshot, operation); }
+    try { await this.analyze(snapshot, operation, localOnly); }
     catch (error) { if (operation === this.operation) this.publish('ERROR', null, this.message(error)); }
   }   // 跟随模式只整理正在播放的字幕，不调用pause、不拥有视频暂停状态
 
@@ -98,7 +98,7 @@ export class InteractionController {
     this.publish(this.state.phase);   // 用户明确重听后，由插件在句末暂停的新归属
   }
 
-  private async analyze(snapshot: SubtitleSnapshot, operation: number): Promise<void> {
+  private async analyze(snapshot: SubtitleSnapshot, operation: number, localOnly = false): Promise<void> {
     this.publish('ANALYZING', null);
     const abort = this.abort!;
     const signal = abort.signal;
@@ -113,12 +113,13 @@ export class InteractionController {
         cancelled = () => reject(new Error('操作已取消'));
         signal.addEventListener('abort', cancelled, { once: true });
       });
-      const context = await Promise.race([this.process(snapshot, signal), deadline]);
+      const processed = await Promise.race([this.process(snapshot, signal), deadline]);
+      const context: SentenceContext = localOnly && processed.learning ? { ...processed, learning: { ...processed.learning, status: 'disabled', contextStatus: 'ready' } } : processed;
       clearTimeout(timer);
       if (cancelled) signal.removeEventListener('abort', cancelled);
       if (operation !== this.operation || signal.aborted) return;
       this.publish('READY', context);   // 先显示本地字幕和排序，不让网络阻塞原文
-      if (this.enrich) {
+      if (this.enrich && !localOnly) {
         const updated = await this.enrich(context, signal, (partial) => {
           if (operation === this.operation && !signal.aborted) this.publish('READY', partial);   // 整句先呈现，表达解析不阻塞它
         });
@@ -133,6 +134,23 @@ export class InteractionController {
   close(): void {
     this.cancel();
     this.publish('IDLE', null);   // 关闭面板不自动播放，继续观看由用户明确决定
+  }
+
+  // retryLearning 重试当前句学习任务，task选择整句或表达，不重新采样、不改变播放时间
+  // 只在已有字幕时调用，旧回复仍受操作序号保护，单任务失败不抹去另一成功结果
+  async retryLearning(task: 'translate' | 'context' | 'both' = 'both'): Promise<void> {
+    const context = this.state.context;
+    if (!context?.learning || !this.enrich) return;
+    const operation = this.cancel();
+    const signal = this.abort!.signal;
+    const next: SentenceContext = { ...context, learning: { ...context.learning, status: task === 'context' ? context.learning.status : 'loading', ...(task !== 'context' ? { error: undefined, cached: false, elapsedMs: undefined, translationState: 'requesting' as const } : {}), ...(task !== 'translate' ? { contextStatus: 'loading' as const, contextError: undefined } : {}) } };
+    this.publish('READY', next);
+    try {
+      const result = await this.enrich(next, signal, (partial) => { if (operation === this.operation && !signal.aborted) this.publish('READY', partial); }, task);
+      if (operation === this.operation && !signal.aborted) this.publish('READY', result);
+    } catch (failure) {
+      if (operation === this.operation && !signal.aborted) this.publish('READY', context, this.message(failure));
+    }
   }
 
   async resume(): Promise<void> {

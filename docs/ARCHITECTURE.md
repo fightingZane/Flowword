@@ -31,3 +31,9 @@ NeighborLine在当前拼句范围外筛真实邻句，展开才查询，卸载�
 ScrollArea保留原生内容滚动但隐藏原生轨道，ResizeObserver/MutationObserver同步自绘滑块，指针和键盘映射scrollTop
 ReplayController可选boundary实时确认DOM目标字幕进入后转换，不依赖已观测end或跳回后清理的字幕缓存
 原生轨道保持cue.end，DOM实时读可见字幕，外部跳转/换源/暂停按旧归属规则取消
+
+## 0.6 当前实现（覆盖上述历史数据/封面描述）
+flowword-archive v2统一保存entries/videos/captures/occurrences/undo，旧wordbook v1只读迁移，不再跨库双写。保存、改名、删除和导入在一个事务中提交；v3备份完整校验后写入，旧版本可导入，当前编辑与复习状态优先，旧编辑表单用updatedAt检查冲突。上限为5万词条/5万视频/10万片段/20万语境与64MiB，不静默截断。
+后台query接口负责分页和索引语境查询，UI不再每次读取完整档案。完整词本40条、快捷词本20条，复习10张；评分和来源重听无模型请求。YouTube可见封面按ID加载，其他站使用已捕获poster/og:image，失败保留占位。
+翻译调度按tab/frame/document及requestId订阅；最后订阅者取消才终止共享请求。缓存异常不抹去已成功响应。预译只对成功新增准备扣会话额度，不能视为提供方计费或token硬上限。
+settings iframe必须持有后台签发且绑定tab/frame的限时授权，独立扩展设置页仍允许直接打开；连接测试不保存配置。

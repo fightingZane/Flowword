@@ -96,20 +96,32 @@ export function prefetchItems(snapshot: SubtitleSnapshot): PrefetchItem[] {
 // 先进入目标字幕再等待消失或切换，滚动累加保留为同片段，不能据此保证自动字幕的完整语义句末
 export function createDomReplayBoundary(snapshot: SubtitleSnapshot, readCaption: () => string, readTime: () => number): () => boolean {
   const target = normalizeText(snapshot.selected.text);
-  let entered = false;
-  let previous = target;
+  // words 提取text连续词形供回放覆盖比对，保留词序，不按任意子串判断已经听完目标
+  const words = (text: string): string[] => text.toLowerCase().match(/[a-z0-9]+(?:['’-][a-z0-9]+)*/g) ?? [];
+  const targetWords = words(target);
+  let covered = 0; let lastObserved = ''; let entered = false; let previous = target; let emptyAt: number | undefined;
   return () => {
-    if (readTime() < snapshot.selected.start - 0.1) return false;
+    const time = readTime(); if (time < snapshot.selected.start - 0.1) return false;
     const current = normalizeText(readCaption());
     if (!entered) {
-      if (current && (current === target || current.includes(target) || target.includes(current))) { entered = true; previous = current; }
+      if (!current || current === lastObserved) return false;
+      lastObserved = current;
+      const currentWords = words(current);
+      if (current === target || current.includes(target)) covered = targetWords.length;
+      else {
+        const start = currentWords.indexOf(targetWords[covered] ?? '');
+        if (start >= 0) for (let index = start; index < currentWords.length && currentWords[index] === targetWords[covered]; index++) covered++;
+      }
+      if (targetWords.length && covered >= targetWords.length) { entered = true; previous = current; }
       return false;
     }
+    if (!current) { emptyAt ??= time; return time - emptyAt >= 0.12; }
+    emptyAt = undefined;
     if (current === previous) return false;
-    if (!current || /[.!?]["'”’)]?$/.test(previous)) return true;
-    const oldWords = previous.toLowerCase().split(/\s+/);
-    const newWords = current.toLowerCase().split(/\s+/);
-    const rolling = current.includes(previous) || previous.includes(current) || oldWords.slice(-2).join(' ') === newWords.slice(0, 2).join(' ');
+    if (/[.!?]["'”’)]?$/.test(previous)) return true;
+    const oldWords = words(previous); const newWords = words(current);
+    const overlap = Array.from({ length: Math.min(oldWords.length, newWords.length) }, (_, index) => index + 1).some((count) => oldWords.slice(-count).every((word, index) => word === newWords[index]));
+    const rolling = current.includes(previous) || previous.includes(current) || overlap;
     if (rolling) { previous = current; return false; }
     return true;
   };

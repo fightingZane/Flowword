@@ -70,7 +70,7 @@ try {
   await page.getByRole('region', { name: '悬浮单词本' }).waitFor();
   await page.locator('.fw-quick-book-list strong').first().waitFor();
   assert.equal(await page.locator('.fw-quick-book-list strong').first().innerText(), 'latest expression');
-  await page.getByLabel('搜索悬浮单词本').fill('最新'); assert.equal(await page.locator('.fw-quick-book-list li').count(), 1);
+  await page.getByLabel('搜索悬浮单词本').fill('最新'); await page.getByText('oldest expression', { exact: true }).waitFor({ state: 'detached' }); assert.equal(await page.locator('.fw-quick-book-list li').count(), 1);
   assert.equal(run.context.pages().length, initialPages);
   const opened = run.context.waitForEvent('page'); await page.getByRole('button', { name: '打开完整词本 ↗' }).click(); const full = await opened;
   await full.waitForLoadState(); assert.match(full.url(), /wordbook\.html/); await full.close();

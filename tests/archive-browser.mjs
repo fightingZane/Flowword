@@ -15,6 +15,8 @@ async function bounded(promise, name) {
   try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${name} 超过 15 秒`)), 15000); })]); }
   finally { clearTimeout(timer); }
 }
+// showSources 表示展开当前词卡来源，无参数，分页词本只在用户展开后读取语境
+async function showSources() { for (const details of await page.locator('.book-occurrences').all()) { if (!await details.evaluate((element) => element.open)) await details.locator('summary').click(); } }
 try {
   console.log('START archive page');
   await page.goto(`chrome-extension://${run.extensionId}/wordbook.html`);
@@ -29,10 +31,13 @@ try {
   const other = await page.evaluate((entry) => chrome.runtime.sendMessage({ type: 'FLOWWORD_BOOK_SAVE', entry }), entry(20, 'https://example.org/video/2'));
   assert.equal(other.ok, true);
   await page.reload();
+  await page.getByRole('heading', { name: 'telephoto', exact: true }).waitFor(); await showSources();
   await page.getByText('Camera lesson · 0:00', { exact: true }).waitFor({ state: 'attached' });
   const sourceCount = await page.locator('.book-source').count(); assert.equal(sourceCount, 11);
   log('同词 11 个语境跨两个视频保存，超过旧库八个语境限制仍完整归档');
-  await page.getByLabel('视频分组').selectOption({ index: 1 });
+  await page.getByLabel('视频分组').selectOption('https://example.com/course?id=7');
+  await page.waitForFunction(() => !document.querySelector('.book-occurrences')?.open); await showSources();
+  await page.waitForFunction(() => document.querySelectorAll('.book-source').length === 10);
   assert.equal(await page.getByLabel('排序方式').inputValue(), 'time');
   assert.equal(await page.locator('.book-source').count(), 10);
   log('按视频筛选关联词条并切换视频时间排序');
@@ -48,13 +53,14 @@ try {
   log('单词本紫藤主题重载后持久化');
   const downloadEvent = page.waitForEvent('download'); await page.getByRole('button', { name: '导出单词本' }).click();
   const download = await downloadEvent; const path = await download.path(); const { readFile } = await import('node:fs/promises'); const backup = JSON.parse(await readFile(path, 'utf8'));
-  assert.equal(backup.version, 2); assert.equal(backup.archive.occurrences.length, 11);
+  assert.equal(backup.version, 3); assert.equal(backup.archive.occurrences.length, 11);
   await page.getByRole('button', { name: '删除条目' }).click();
   await page.getByText('还没有条目', { exact: false }).waitFor();
   await page.locator('input[type=file]').setInputFiles({ name: 'FlowWord-backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
+  await page.getByRole('heading', { name: 'telephoto', exact: true }).waitFor(); await showSources();
   await page.getByText('Camera lesson · 0:00', { exact: true }).waitFor({ state: 'attached' });
   assert.equal(await page.locator('.book-source').count(), 11);
-  log('JSON v2 导出、删除、导入恢复全部跨视频语境');
+  log('JSON v3 导出、删除、导入恢复全部跨视频语境');
   const legacy = { version: 1, entries: [{ ...entry(3), kind: 'sentence', text: 'A sentence worth keeping.', translation: '值得留下的一句话', partOfSpeech: '句子', contexts: [{ sentence: 'A sentence worth keeping.', url: 'https://example.com/course?id=7', title: 'Camera lesson', time: 3, translation: '值得留下的一句话' }] }] };
   await page.locator('input[type=file]').setInputFiles({ name: 'legacy.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacy)) });
   await page.getByRole('heading', { name: 'A sentence worth keeping.' }).waitFor();
@@ -80,7 +86,7 @@ try {
   const mediaCaptures = restoredBackup.archive.captures.filter((item) => ['media-a', 'media-b'].includes(item.videoId));
   assert.equal(mediaCaptures.length, 2); assert.deepEqual(mediaCaptures.map((item) => item.end).sort(), [34, 36]);
   assert.deepEqual(restoredBackup.archive.occurrences.filter((item) => item.entryId === 'word:charged').map((item) => item.translation).sort(), ['充电', '收费']);
-  log('v2 导入保留同页面不同媒体身份、结束时间与语境词义');
+  log('v3 导入保留同页面不同媒体身份、结束时间与语境词义');
   await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/wordbook-v03.png', fullPage: true });
   await writeFile('test-results/archive-report.json', JSON.stringify({ environment: 'isolated production extension IndexedDB; synthetic videos only', cases }, null, 2));
   console.log(`PASS ${cases.length} archive browser cases`);

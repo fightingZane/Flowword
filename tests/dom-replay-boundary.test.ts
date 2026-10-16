@@ -21,8 +21,22 @@ describe('DOM字幕重听实时边界', () => {
     text = 'Next sentence.'; time = 7; expect(boundary()).toBe(true);
   });
   it('已进入目标后字幕消失是实际可观察转换，不等待点击时刻', () => {
-    let text = 'The vapor chamber';
-    const boundary = createDomReplayBoundary(snapshot, () => text, () => 4.3);
-    expect(boundary()).toBe(false); text = ''; expect(boundary()).toBe(true);
+    let text = 'The vapor chamber'; let time = 4.3;
+    const boundary = createDomReplayBoundary(snapshot, () => text, () => time);
+    expect(boundary()).toBe(false); text = ''; expect(boundary()).toBe(false); time = 4.45; expect(boundary()).toBe(true);
   });
+});
+
+it('目标The Pro chip回放先The再Pro chip不会在半句停下', () => {
+  let text = 'The'; let time = 4;
+  const boundary = createDomReplayBoundary({ ...snapshot, selected: { ...snapshot.selected, text: 'The Pro chip' } }, () => text, () => time);
+  expect(boundary()).toBe(false); time = 4.2; text = 'Pro chip'; expect(boundary()).toBe(false);
+  time = 4.4; text = 'chip handles intensive games.'; expect(boundary()).toBe(false);
+  time = 5; text = 'Another sentence.'; expect(boundary()).toBe(true);
+});
+
+it('目标尚未完整覆盖时无关字幕不能触发已完成暂停', () => {
+  let text = 'The';
+  const boundary = createDomReplayBoundary({ ...snapshot, selected: { ...snapshot.selected, text: 'The Pro chip' } }, () => text, () => 4);
+  expect(boundary()).toBe(false); text = 'Unrelated caption'; expect(boundary()).toBe(false);
 });

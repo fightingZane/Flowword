@@ -23,7 +23,7 @@ function setTracks(value: HTMLVideoElement, tracks: TextTrack[]) {
 let elements: HTMLVideoElement[];
 beforeEach(() => {
   elements = [video()];
-  vi.stubGlobal('document', { querySelectorAll: () => elements, fullscreenElement: null, title: 'Lecture' });
+  vi.stubGlobal('document', { querySelector: () => null, querySelectorAll: () => elements, fullscreenElement: null, title: 'Lecture' });
   vi.stubGlobal('window', { innerWidth: 1280, innerHeight: 800 });
   vi.stubGlobal('location', { href: 'https://video.example/lesson?id=4' });
   vi.stubGlobal('getComputedStyle', () => ({ display: 'block', visibility: 'visible', opacity: '1' }));
