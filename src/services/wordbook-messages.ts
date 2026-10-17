@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import type { EntryPatch, EntryQuery, ReviewGrade } from '../core/types';
+import type { EntryPatch, EntryQuery, ReviewGrade, SourceKind } from '../core/types';
 import { allEntries, batchEntries, bookSummary, deleteEntries, entryOccurrences, exportBackup, gradeReview, importBackup, queryEntries, reviewDue, savedEntryIds, saveEntry, undoDelete, updateOccurrence } from '../storage/wordbook';
 
 interface MessageSender { id?: string; url?: string; tab?: { id?: number } }
@@ -35,15 +35,15 @@ export async function handleWordbookMessage(message: unknown, sender: MessageSen
       case 'FLOWWORD_BOOK_STATUS': result = { savedIds: await savedEntryIds(request.ids as string[]) }; break;
       case 'FLOWWORD_BOOK_QUERY': result = await queryEntries((request.query ?? {}) as EntryQuery); break;
       case 'FLOWWORD_BOOK_SUMMARY': result = await bookSummary(); break;
-      case 'FLOWWORD_BOOK_OCCURRENCES': result = { occurrences: await entryOccurrences(request.id as string, typeof request.videoId === 'string' ? request.videoId : undefined) }; break;
+      case 'FLOWWORD_BOOK_OCCURRENCES': result = { occurrences: await entryOccurrences(request.id as string, typeof request.sourceId === 'string' ? request.sourceId : typeof request.videoId === 'string' ? request.videoId : undefined) }; break;
       case 'FLOWWORD_OCCURRENCE_UPDATE': result = { occurrence: await updateOccurrence(request.id as string, request.translation as string) }; changed = true; break;
       case 'FLOWWORD_BOOK_BATCH': result = await batchEntries(request.ids as string[], request.patch as EntryPatch); changed = true; break;
       case 'FLOWWORD_BOOK_DELETE': result = await deleteEntries([request.id as string]); changed = true; break;
       case 'FLOWWORD_BOOK_DELETE_MANY': result = await deleteEntries(request.ids as string[]); changed = true; break;
       case 'FLOWWORD_BOOK_UNDO': result = await undoDelete(request.token as string); changed = true; break;
-      case 'FLOWWORD_BOOK_EXPORT': result = { backup: await exportBackup((request.query ?? {}) as { videoId?: string }) }; break;
+      case 'FLOWWORD_BOOK_EXPORT': result = { backup: await exportBackup((request.query ?? {}) as { videoId?: string; sourceId?: string; sourceKind?: SourceKind }) }; break;
       case 'FLOWWORD_BOOK_IMPORT': result = await importBackup(request.backup); changed = true; break;
-      case 'FLOWWORD_REVIEW_DUE': result = { cards: await reviewDue((request.query ?? {}) as { limit?: number; videoId?: string }) }; break;
+      case 'FLOWWORD_REVIEW_DUE': result = { cards: await reviewDue((request.query ?? {}) as { limit?: number; videoId?: string; sourceId?: string; sourceKind?: SourceKind }) }; break;
       case 'FLOWWORD_REVIEW_GRADE': result = { review: await gradeReview(request.id as string, request.grade as ReviewGrade) }; changed = true; break;
       default: return;
     }

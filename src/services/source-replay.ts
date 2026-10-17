@@ -1,5 +1,5 @@
 import { browser, type Browser } from 'wxt/browser';
-import { normalizeReplaySource, type SourceReplayRequest } from '../core/source-replay';
+import { normalizeReplaySource, normalizeWebSource, webSourceLink, type SourceReplayRequest } from '../core/source-replay';
 
 const pendingPrefix = 'flowword-source-replay:';
 const delivering = new Set<number>();
@@ -34,6 +34,11 @@ export async function handleSourceReplay(message: { type?: string; source?: unkn
   if (message.type === 'FLOWWORD_SOURCE_READY') { if (sender.tab?.id !== undefined) void deliverPendingSourceReplay(sender.tab.id); return { ok: true }; }
   if (message.type !== 'FLOWWORD_REPLAY_SOURCE') return;
   if (!sender.url?.startsWith(browser.runtime.getURL('/')) && !/^https?:\/\//.test(sender.url || '')) return { ok: false, error: '无效回看入口' };
+  if ((message.source as { source?: { kind?: string } })?.source?.kind === 'web') {
+    const source = normalizeWebSource(message.source);
+    await browser.tabs.create({ url: webSourceLink(source) });
+    return { ok: true, opened: true, message: '已回到原文，页面内容变化时可搜索收藏原句' };
+  }
   const source = normalizeReplaySource(message.source);
   for (const tab of await browser.tabs.query({})) {
     if (tab.id === undefined) continue;

@@ -19,7 +19,7 @@ if (existing?.isSymbolicLink()) throw new Error('生成目录不能是符号链�
 await rm(output, { recursive: true, force: true });   // 已校验绝对路径，只重建项目内的生成目录
 await mkdir(output, { recursive: true });
 await cp(built, output, { recursive: true });
-for (const version of ['0.1.0', '0.2.0', '0.3.0', '0.3.1', '0.4.0', '0.5.0', '0.5.1', '0.6.0']) {
+for (const version of ['0.1.0', '0.2.0', '0.3.0', '0.3.1', '0.4.0', '0.5.0', '0.5.1', '0.6.0', '0.6.1', '0.7.0', '0.8.0', '0.9.0', '0.9.1']) {
   const previous = resolve(`release/FlowWord-${version}`);
   const previousInfo = await lstat(previous).catch(() => null);
   if (previousInfo) {
@@ -29,15 +29,21 @@ for (const version of ['0.1.0', '0.2.0', '0.3.0', '0.3.1', '0.4.0', '0.5.0', '0.
   }
 }
 await cp('INSTALL.md', 'release/安装说明.md');
+await cp('docs/FEATURES.md', 'release/功能手册.md');
 await cp('TEST_REPORT.md', 'release/验证报告.md');
+const companion = resolve('release/FlowWord-CLI-Bridge');
+await mkdir(resolve(companion, 'scripts'), { recursive: true });
+await cp('scripts/codex-bridge.mjs', resolve(companion, 'scripts/codex-bridge.mjs'));
+await cp('scripts/start-codex-bridge.cmd', resolve(companion, 'scripts/start-codex-bridge.cmd'));
+await writeFile(resolve(companion, 'README.md'), '# FlowWord Codex CLI 桥接\n\n需已安装 Node.js 与官方 Codex CLI，并使用 ChatGPT 登录\n\nWindows 双击 scripts/start-codex-bridge.cmd，保留窗口，再在插件模型设置中导入本目录 .local/codex-bridge/connection.json\n\n其他系统在本目录运行 node scripts/codex-bridge.mjs\n\n关闭窗口即停止服务；不要公开连接文件。状态检查不调用模型，翻译会使用当前CLI账户额度，首次调用可能较慢\n');
 await cp(`.output/flowword-${metadata.version}-chrome.zip`, `release/FlowWord-${metadata.version}.zip`);
 const evidence = resolve(`release/verification-${metadata.version}`);
 await mkdir(evidence, { recursive: true });
 const evidenceFiles = [];
-for (const file of ['wordbook-list-v06.png', 'wordbook-review-v06.png', 'wordbook-narrow-v06.png', 'quick-review-v06.png', 'wordbook-v06-report.json', 'security-v06-report.json', 'e2e-report.json', 'features-report.json', 'upgrade-report.json', 'archive-report.json', 'sites-report.json', 'translation-live-report.json', 'floating-light.png', 'floating-dark.png', 'floating-narrow.png', 'floating-fullscreen.png', 'popup.png', 'configuration.png', 'upgrade-v03.png', 'wordbook-v03.png', 'wordbook-dark-wide.png', 'archive-layout-report.json', 'wordbook-sidebar-wide.png', 'wordbook-sidebar-dark.png', 'wordbook-sidebar-narrow.png', 'panels-report.json', 'panels-model-settings.png', 'panels-neighbors.png', 'panels-quick-wordbook.png', 'dom-replay-report.json']) {
+for (const file of ['settings-v092-matched.png','settings-v091-report.json', 'settings-v091-blue.png', 'settings-v091-dark.png', 'settings-v091-light.png', 'settings-v091-narrow.png', 'selection-layout-v091-report.json', 'selection-layout-v091.png','scope-v09-report.json', 'lookup-report.json', 'lookup-wide.png', 'lookup-narrow.png', 'scope-v09-settings.png','providers-v08-cli.png', 'providers-v08-report.json', 'codex-live-status-v08.json', 'codex-live-translation-v08.json', 'codex-live-context-v08.json', 'codex-bridge-report.json', 'selection-v07-translation.png', 'ui-v07-report.json', 'selection-v07-report.json', 'ui-v07-book-wide.png', 'ui-v07-book-narrow.png', 'ui-v07-web-review.png', 'ui-v07-quick.png', 'ui-v07-quick-review.png', 'wordbook-list-v06.png', 'wordbook-review-v06.png', 'wordbook-narrow-v06.png', 'quick-review-v06.png', 'wordbook-v06-report.json', 'security-v06-report.json', 'e2e-report.json', 'features-report.json', 'upgrade-report.json', 'archive-report.json', 'sites-report.json', 'translation-live-report.json', 'floating-light.png', 'floating-dark.png', 'floating-narrow.png', 'floating-fullscreen.png', 'popup.png', 'configuration.png', 'upgrade-v03.png', 'wordbook-v03.png', 'wordbook-dark-wide.png', 'archive-layout-report.json', 'wordbook-sidebar-wide.png', 'wordbook-sidebar-dark.png', 'wordbook-sidebar-narrow.png', 'panels-report.json', 'panels-model-settings.png', 'panels-neighbors.png', 'panels-quick-wordbook.png', 'dom-replay-report.json']) {
   const source = resolve('test-results', file);
   const available = await lstat(source).catch(() => null);
-  evidenceFiles.push({ file, available: Boolean(available) });
+  evidenceFiles.push({ file, available: Boolean(available), modifiedAt: available?.mtime.toISOString() });
   if (available) await cp(source, resolve(evidence, file));   // 交付实测证据，不只留下成功结论
 }
 await writeFile(resolve(evidence, 'evidence-manifest.json'), JSON.stringify({ version: metadata.version, files: evidenceFiles }, null, 2));

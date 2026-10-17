@@ -5,8 +5,10 @@ export function FlowMark({ size = 25 }: { size?: number }) {
   </svg>;
 }
 
-export function Icon({ name, size = 18 }: { name: 'close' | 'play' | 'copy' | 'back' | 'check' | 'pause' | 'sun' | 'arrow'; size?: number }) {
+export function Icon({ name, size = 18 }: { name: 'close' | 'play' | 'copy' | 'back' | 'check' | 'pause' | 'sun' | 'arrow' | 'bookmark' | 'settings'; size?: number }) {
   const paths = {
+    bookmark: <path d="M6 4h12v17l-6-4-6 4Z" />,
+    settings: <><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" /><circle cx="15" cy="17" r="3" /></>,
     close: <path d="m6 6 12 12M18 6 6 18" />,
     play: <path d="m9 5 11 7-11 7Z" />,
     copy: <><rect x="8" y="8" width="12" height="12" rx="3" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></>,

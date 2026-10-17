@@ -1,5 +1,6 @@
-export type ProviderMode = 'off' | 'cloud' | 'mymemory';
-export interface ProviderConfig { mode: ProviderMode; endpoint: string; model: string; apiKey: string; prefetch: boolean; prefetchExpressions?: boolean }
+export type ProviderMode = 'off' | 'cloud' | 'mymemory' | 'codex-cli';
+export interface ProviderConfig { mode: ProviderMode; endpoint: string; model: string; apiKey: string; prefetch: boolean; prefetchExpressions?: boolean; protocol?: 'chat-completions' | 'responses' }
+export const CODEX_BRIDGE_ENDPOINT = 'http://127.0.0.1:17863';
 export const DEFAULT_PROVIDER: ProviderConfig = { mode: 'off', endpoint: 'https://api.deepseek.com/chat/completions', model: 'deepseek-flash', apiKey: '', prefetch: false, prefetchExpressions: false };
 let database: Promise<IDBDatabase> | undefined;
 // open 打开扩展来源的服务数据库，无参数，后台和独立设置页复用
@@ -27,12 +28,14 @@ async function operation<T>(store: string, mode: IDBTransactionMode, run: (store
 // validateProvider 校验value服务配置并规范化，保存前调用
 // 只允许HTTPS完整接口，不允许URL携带密钥参数，云模式要求模型与密钥齐全
 export function validateProvider(value: ProviderConfig): ProviderConfig {
-  if (!['off', 'cloud', 'mymemory'].includes(value.mode)) throw new Error('服务类型无效');
+  if (!['off', 'cloud', 'mymemory', 'codex-cli'].includes(value.mode)) throw new Error('服务类型无效');
   const endpoint = new URL(value.endpoint);
-  if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('接口必须是无账号、参数的 HTTPS 地址');
+  if (value.mode === 'codex-cli' ? endpoint.href !== CODEX_BRIDGE_ENDPOINT + '/' : endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error(value.mode === 'codex-cli' ? 'CLI 桥接仅允许本机固定地址' : '接口必须是无账号、参数的 HTTPS 地址');
   if (value.model.length > 150 || value.apiKey.length > 4096 || /[\r\n]/.test(value.apiKey)) throw new Error('模型或密钥格式无效');
   if (value.mode === 'cloud' && (!value.model.trim() || !value.apiKey.trim())) throw new Error('请填写模型和 API Key');
-  return { mode: value.mode, endpoint: endpoint.href, model: value.model.trim(), apiKey: value.apiKey.trim(), prefetch: value.prefetch === true, prefetchExpressions: value.prefetchExpressions === true };
+  if (value.mode === 'codex-cli' && !/^[a-f0-9]{64}$/.test(value.apiKey)) throw new Error('请导入本机桥接连接文件');
+  if (value.protocol !== undefined && !['chat-completions', 'responses'].includes(value.protocol)) throw new Error('接口协议无效');
+  return { mode: value.mode, endpoint: endpoint.href, model: value.model.trim(), apiKey: value.apiKey.trim(), prefetch: value.mode !== 'codex-cli' && value.prefetch === true, prefetchExpressions: value.mode !== 'codex-cli' && value.prefetchExpressions === true, ...(value.protocol ? { protocol: value.protocol } : {}) };
 }
 // readProvider 读取完整本地配置，无参数，仅扩展可信页面或后台可调用，不能经公开RPC返回
 export async function readProvider(): Promise<ProviderConfig | undefined> { return operation('config', 'readonly', (store) => store.get('provider')); }

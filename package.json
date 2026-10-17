@@ -1,8 +1,8 @@
 {
   "name": "flowword",
-  "description": "低干扰的 YouTube 英语字幕悬浮助手",
+  "description": "英语视频字幕与网页划词学习助手",
   "private": true,
-  "version": "0.6.1",
+  "version": "0.9.2",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -19,13 +19,22 @@
     "test:youtube": "node scripts/youtube-smoke.mjs",
     "browser:install": "node scripts/install-browser.mjs",
     "package": "node scripts/package.mjs",
-    "verify": "npm run typecheck && npm test && npm run build && npm run test:e2e && npm run test:features && npm run test:upgrade && npm run test:archive && npm run test:sites && npm run test:layout && npm run test:panels && npm run test:dom-replay && npm run test:v06 && npm run test:security",
+    "verify": "npm run typecheck && npm test && npm run build && npm run test:e2e && npm run test:features && npm run test:upgrade && npm run test:archive && npm run test:sites && npm run test:layout && npm run test:panels && npm run test:dom-replay && npm run test:v06 && npm run test:security && npm run test:selection && npm run test:ui && npm run test:providers && npm run test:bridge && npm run test:lookup && npm run test:scope && npm run test:settings && npm run test:selection-layout",
     "postinstall": "wxt prepare",
     "test:layout": "node tests/archive-layout-browser.mjs",
     "test:panels": "node scripts/panels-e2e.mjs",
     "test:dom-replay": "node scripts/dom-replay-e2e.mjs",
     "test:v06": "node scripts/wordbook-v06-e2e.mjs",
-    "test:security": "node scripts/security-v06-e2e.mjs"
+    "test:security": "node scripts/security-v06-e2e.mjs",
+    "test:selection": "node scripts/selection-v07-e2e.mjs",
+    "test:ui": "node scripts/ui-v07-e2e.mjs",
+    "bridge": "node scripts/codex-bridge.mjs",
+    "test:providers": "node scripts/providers-v08-e2e.mjs",
+    "test:bridge": "node --test tests/codex-bridge.node.mjs",
+    "test:lookup": "node scripts/lookup-e2e.mjs",
+    "test:scope": "node scripts/scope-v09-e2e.mjs",
+    "test:settings": "node scripts/settings-v091-e2e.mjs",
+    "test:selection-layout": "node scripts/selection-layout-v091-e2e.mjs"
   },
   "dependencies": {
     "react": "19.3.0",

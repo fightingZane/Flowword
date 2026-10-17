@@ -1,5 +1,8 @@
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
+import { handleLookupLocalMessage } from '../src/services/lookup-local-messages';
+import { handleLookupMessage, cancelLookupRequests } from '../src/services/lookup-messages';
+import { handleSiteScope } from '../src/services/site-scope';
 import { STORAGE } from '../src/storage/settings';
 import { effectiveProvider, cancelAllLearningRequests } from '../src/services/learning-background';
 import { handleWordbookMessage } from '../src/services/wordbook-messages';
@@ -16,24 +19,27 @@ export default defineBackground(() => {
         const extensionPage = sender.url?.startsWith(browser.runtime.getURL('/')) === true;
         const access = await handleSettingsAccess(message, sender);
         if (access !== undefined) return access;
-        if (extensionPage && !await isSettingsFrameGranted(sender)) return { ok: false, error: '请从悬浮球打开配置框' };
+        if (extensionPage && !await isSettingsFrameGranted(sender)) return { ok: false, error: '请从FlowWord面板打开配置框' };
+        if (extensionPage) { const scope = await handleSiteScope(message); if (scope !== undefined) return scope; }
         const source = await handleSourceReplay(message, sender);
         if (source !== undefined) return source;
+        const lookup = await handleLookupMessage(message, sender); if (lookup !== undefined) return lookup;
+        const localLookup = await handleLookupLocalMessage(message, sender); if (localLookup !== undefined) return localLookup;
         const translated = await handleTranslationMessage(message, sender);
         if (translated !== undefined) return translated;
         const book = await handleWordbookMessage(message, sender);
         if (book !== undefined) return book;
 
         if (message.type === 'FLOWWORD_PROVIDER_CHANGED' && extensionPage) {
-          cancelAllLearningRequests();
+          cancelAllLearningRequests(); cancelLookupRequests();
           const config = await effectiveProvider();
-          const publicConfig = { mode: config.mode, model: config.model, prefetch: config.prefetch, prefetchExpressions: config.prefetchExpressions === true, configured: config.mode !== 'cloud' || !!config.apiKey };
+          const publicConfig = { mode: config.mode, model: config.model, prefetch: config.prefetch, prefetchExpressions: config.prefetchExpressions === true, configured: !['cloud', 'codex-cli'].includes(config.mode) || !!config.apiKey };
           for (const tab of await browser.tabs.query({})) if (tab.id !== undefined) void browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_PROVIDER_CHANGED', ...publicConfig }).catch(() => {});
           return { ok: true };
         }
         if (message.type === 'FLOWWORD_PROVIDER_PUBLIC') {
           const config = await effectiveProvider();
-          return { ok: true, mode: config.mode, model: config.model, prefetch: config.prefetch, prefetchExpressions: config.prefetchExpressions === true, configured: config.mode !== 'cloud' || !!config.apiKey };
+          return { ok: true, mode: config.mode, model: config.model, prefetch: config.prefetch, prefetchExpressions: config.prefetchExpressions === true, configured: !['cloud', 'codex-cli'].includes(config.mode) || !!config.apiKey };
         }
         if (message.type === 'FLOWWORD_SETTINGS_OPEN') { await browser.tabs.create({ url: browser.runtime.getURL('/settings.html') }); return { ok: true }; }
         if (message.type === 'FLOWWORD_ENABLE_SITE' && extensionPage) {
@@ -43,7 +49,7 @@ export default defineBackground(() => {
           if (origin === 'https://www.youtube.com') return { ok: true };
           const registered = await browser.scripting.getRegisteredContentScripts({ ids: [id] });
           if (!registered.length) await browser.scripting.registerContentScripts([{ id, matches: [origin + '/*'], js: ['content-scripts/flowword.js'], runAt: 'document_idle', persistAcrossSessions: true }]);
-          return { ok: true };
+          return await handleSiteScope({ type: 'FLOWWORD_SCOPE_SITE', origin, enabled: true });
         }
         if (message.type === 'FLOWWORD_BOOK_OPEN') { await browser.tabs.create({ url: browser.runtime.getURL('/wordbook.html') }); return { ok: true }; }
         return { ok: false, error: '未知操作' };
@@ -53,7 +59,7 @@ export default defineBackground(() => {
   browser.permissions.onRemoved.addListener((removed) => {
     void (async () => {
       if (!removed.origins?.length) return;
-      cancelAllLearningRequests();
+      cancelAllLearningRequests(); cancelLookupRequests();
       const registered = await browser.scripting.getRegisteredContentScripts();
       const checks = await Promise.all(registered.filter((script) => script.id.startsWith('flowword-site-')).map(async (script) => ({ script, allowed: await browser.permissions.contains({ origins: script.matches ?? [] }) })));
       const revoke = checks.filter((item) => !item.allowed).map((item) => item.script);
@@ -63,7 +69,7 @@ export default defineBackground(() => {
       for (const tab of await browser.tabs.query({})) if (tab.id !== undefined) void browser.tabs.sendMessage(tab.id, { type: 'FLOWWORD_SITE_REVOKED', origins: revokedMatches }).catch(() => {});
     })().catch(() => {});
   });   // 只撤销已注册网站脚本，接口授权不会被误当成视频站授权
-  browser.tabs.onRemoved.addListener((tabId) => { cancelTranslationOwner(tabId); void clearSettingsGrants(tabId); });
+  browser.tabs.onRemoved.addListener((tabId) => { cancelTranslationOwner(tabId); cancelLookupRequests(tabId); void clearSettingsGrants(tabId); });
   browser.tabs.onUpdated.addListener((tabId, changed) => { if (changed.status === 'complete') void deliverPendingSourceReplay(tabId); });
   browser.commands.onCommand.addListener((command) => {
     void (async () => {
@@ -78,7 +84,7 @@ export default defineBackground(() => {
     const enabled = stored[STORAGE.enabled] === true;
     await browser.action.setBadgeText({ text: enabled ? 'ON' : '' });
     await browser.action.setBadgeBackgroundColor({ color: '#355f47' });
-    await browser.action.setTitle({ title: enabled ? 'FlowWord · 悬浮球已开启' : 'FlowWord · 开启悬浮球' });
+    await browser.action.setTitle({ title: enabled ? 'FlowWord · 学习助手已开启' : 'FlowWord · 开启学习助手' });
   }
   const refresh = () => { void updateBadge().catch((error) => console.warn('FlowWord 标识更新失败', error)); };
   browser.runtime.onInstalled.addListener(refresh);

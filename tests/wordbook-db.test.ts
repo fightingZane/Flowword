@@ -13,6 +13,14 @@ function value(text = 'charge', time = 1, videoKey = 'video-a', translation = '�
   ] };
 }
 
+// webValue 构造网页划词收藏，quote记录真实选文附近短文，url允许章节或单页路由
+// 不提供time/end/videoKey，确保测试不会把网页伪装成零秒视频
+function webValue(text = 'obscure', url = 'https://example.test/article#lesson') {
+  return { kind: 'word' as const, text, translation: '生僻的，难以理解的', partOfSpeech: '形容词', tags: ['阅读'], examTags: [], contexts: [
+    { source: { kind: 'web' as const, quote: { exact: text, prefix: 'An ', suffix: ' reference.' } }, sentence: `An ${text} reference.`, url, title: 'Reading for Science', translation: '一个生僻的提及' },
+  ] };
+}
+
 // readRequest 将测试IDB请求转为Promise，request只能来自本用例的隔离工厂
 // 不用于生产事务，也不添加网络等待或计时器
 function readRequest<T>(request: IDBRequest<T>): Promise<T> {
@@ -75,7 +83,7 @@ describe('canonical事务与旧库迁移', () => {
       if (this.name === 'occurrences') throw new DOMException('Injected quota', 'QuotaExceededError'); return put.apply(this, args);
     });
     await expect(book.saveEntry(value())).rejects.toThrow(); vi.restoreAllMocks();
-    expect(await book.allEntries()).toEqual([]); expect(await archive.archiveSnapshot()).toEqual({ videos: [], captures: [], occurrences: [] });
+    expect(await book.allEntries()).toEqual([]); expect(await archive.archiveSnapshot()).toEqual({ sources: [], videos: [], captures: [], occurrences: [] });
   });
   it('改名关联故障不删除旧词条或历史词义', async () => {
     const saved = await book.saveEntry(value()); const before = await book.exportBackup(); const put = IDBObjectStore.prototype.put;
@@ -103,6 +111,96 @@ describe('canonical事务与旧库迁移', () => {
       occurrences: [{ id: 'orphan', entryId: 'word:deleted', captureId: 'capture', text: 'deleted', translation: '历史孤立资料', createdAt: 1 }] });
     await expect(book.exportBackup()).rejects.toThrow(); expect((await archive.archiveSnapshot()).occurrences.some((item) => item.id === 'orphan')).toBe(true);
     expect((await book.allEntries())[0]?.id).toBe(entry.id);
+  });
+});
+
+describe('网页来源与旧视频数据兼容', () => {
+  it('网页收藏保存正式kind与原文定位，时间与媒体字段完全缺失', async () => {
+    const saved = await book.saveEntry(webValue()); const context = saved.contexts[0]!;
+    expect(context.source).toEqual({ kind: 'web', quote: { exact: 'obscure', prefix: 'An ', suffix: ' reference.' } });
+    for (const field of ['time', 'end', 'videoKey']) expect(Object.hasOwn(context, field)).toBe(false);
+    const occurrence = (await book.entryOccurrences(saved.id))[0]!;
+    expect(occurrence.capture.sourceId).toBe('web:https://example.test/article#lesson'); expect(Object.hasOwn(occurrence.capture, 'videoId')).toBe(false);
+    expect(archive.sourceLink(occurrence.capture)).toBe('https://example.test/article#lesson');
+    const summary = await book.bookSummary(); expect(summary.videos).toEqual([]); expect(summary.sources[0]).toMatchObject({ kind: 'web', count: 1 });
+  });
+  it('同网址的网页和视频分开归档，视频零秒仍是真实有效时间', async () => {
+    const page = webValue('charge', 'https://example.test/watch'); await book.saveEntry(page);
+    const video = value('charge', 0, 'media'); await book.saveEntry(video);
+    const summary = await book.bookSummary(); expect(summary.sources.map((source) => source.kind).sort()).toEqual(['video', 'web']); expect(summary.videos).toHaveLength(1);
+    const occurrences = await book.entryOccurrences('word:charge'); expect(occurrences).toHaveLength(2);
+    expect(occurrences.find((row) => row.capture.source?.kind === 'video')?.capture.time).toBe(0);
+    expect(occurrences.find((row) => row.capture.source?.kind === 'web')?.capture.time).toBeUndefined();
+  });
+  it('拒绝网页伪造时间、媒体身份或不明kind，不写入部分来源', async () => {
+    for (const patch of [{ time: 0 }, { end: 3 }, { videoKey: 'media' }, { source: { kind: 'webpage' } }]) {
+      const entry = webValue(); await expect(book.saveEntry({ ...entry, contexts: [{ ...entry.contexts[0], ...patch }] })).rejects.toThrow();
+    }
+    expect(await book.allEntries()).toEqual([]); expect((await book.bookSummary()).sources).toEqual([]);
+  });
+  it('相同选文在不同上下文中保留独立语境，重复收藏不会重复', async () => {
+    const first = webValue(); await book.saveEntry(first); await book.saveEntry(first);
+    const second = webValue(); second.contexts[0]!.source.quote.prefix = 'Another '; await book.saveEntry({ ...second, translation: '不为人知的' });
+    const rows = await book.entryOccurrences('word:obscure'); expect(rows).toHaveLength(2); expect(rows.map((row) => row.translation).sort()).toEqual(['不为人知的', '生僻的，难以理解的']);
+    expect((await book.allEntries())[0]?.contexts).toHaveLength(2);
+  });
+  it('来源类型、标题与来源ID筛选覆盖完整归档并兼容videoId旧参', async () => {
+    await book.saveEntry(webValue()); await book.saveEntry(value());
+    expect((await book.queryEntries({ sourceKind: 'web' })).entries.map((entry) => entry.text)).toEqual(['obscure']);
+    expect((await book.queryEntries({ sourceKind: 'video' })).entries.map((entry) => entry.text)).toEqual(['charge']);
+    expect((await book.queryEntries({ search: 'SCIENCE reading' })).entries.map((entry) => entry.text)).toEqual(['obscure']);
+    const sourceId = 'web:https://example.test/article#lesson';
+    expect((await book.queryEntries({ sourceId })).entries[0]?.contexts[0]?.source?.kind).toBe('web');
+    expect((await book.queryEntries({ videoId: sourceId })).total).toBe(1);
+    expect((await book.queryEntries({ sourceId, sourceKind: 'video' })).total).toBe(0);
+    expect((await book.reviewDue({ sourceId }))[0]?.contexts[0]?.capture.source?.kind).toBe('web');
+    expect((await book.reviewDue({ sourceKind: 'web' })).map((card) => card.entry.text)).toEqual(['obscure']);
+  });
+  it('按网页类型筛选时补回八条摘要以外的网页语境，不显示另一个视频来源', async () => {
+    const page = webValue('charge'); await book.saveEntry(page);
+    for (let time = 1; time < 10; time++) await book.saveEntry(value('charge', time));
+    expect((await book.allEntries())[0]?.contexts.every((context) => context.source?.kind === 'video')).toBe(true);
+    const filtered = await book.queryEntries({ sourceKind: 'web' }); expect(filtered.entries[0]?.contexts).toHaveLength(1);
+    expect(filtered.entries[0]?.contexts[0]?.source?.kind).toBe('web'); expect(filtered.entries[0]?.contexts[0]?.time).toBeUndefined();
+  });
+  it('网页v4按来源备份恢复全部原文与词义，不混入视频语境', async () => {
+    const saved = await book.saveEntry(webValue()); await book.saveEntry(value('obscure'));
+    const sourceId = 'web:https://example.test/article#lesson'; const backup = await book.exportBackup({ sourceId });
+    expect(backup.version).toBe(4); expect(backup.archive.sources).toHaveLength(1); expect(backup.archive.sources[0]?.kind).toBe('web');
+    expect(backup.archive.captures.every((capture) => capture.source?.kind === 'web' && !Object.hasOwn(capture, 'time'))).toBe(true);
+    expect(backup.entries[0]?.contexts.every((context) => context.source?.kind === 'web')).toBe(true);
+    await book.deleteEntries([saved.id]); await book.importBackup(backup); await book.importBackup(backup);
+    const restored = (await book.entryOccurrences(saved.id)).find((row) => row.capture.source?.kind === 'web'); expect(restored?.capture.source?.quote?.exact).toBe('obscure');
+    expect(restored?.translation).toBe('生僻的，难以理解的');
+  });
+  it('旧v3完整备份导入后仍为视频且原capture和occurrence ID不变化', async () => {
+    const entry = { ...value(), id: 'word:charge', createdAt: 1, updatedAt: 2 };
+    const context = entry.contexts[0]!; const captureId = JSON.stringify(['video-a', context.time, context.sentence]); const occurrenceId = JSON.stringify([entry.id, captureId]);
+    await book.importBackup({ version: 3, entries: [entry], archive: { videos: [{ id: 'video-a', url: context.url, title: context.title, updatedAt: 2 }],
+      captures: [{ ...context, id: captureId, videoId: 'video-a' }], occurrences: [{ id: occurrenceId, entryId: entry.id, captureId, text: entry.text, translation: entry.translation, createdAt: 1 }] } });
+    const backup = await book.exportBackup(); expect(backup.version).toBe(4); expect(backup.archive.sources[0]?.kind).toBe('video');
+    expect(backup.archive.captures[0]).toMatchObject({ id: captureId, sourceId: 'video-a', videoId: 'video-a', time: 1, source: { kind: 'video' } }); expect(backup.archive.occurrences[0]?.id).toBe(occurrenceId);
+  });
+  it('已存在DBv2升级v3只补来源字段与索引，不改键和复习资料', async () => {
+    const entry = { ...book.validateEntry(value()), status: 'learning' as const, review: { dueAt: 10, repetitions: 1, intervalDays: 1, lapses: 0 } };
+    entry.contexts = entry.contexts.map(({ source: _source, ...context }) => context);
+    const context = entry.contexts[0]!; const captureId = JSON.stringify(['video-a', context.time, context.sentence]); const occurrenceId = JSON.stringify([entry.id, captureId]);
+    const request = indexedDB.open('flowword-archive', 2); request.onupgradeneeded = () => { for (const name of ['entries', 'videos', 'captures', 'occurrences', 'meta', 'undo']) request.result.createObjectStore(name, { keyPath: 'id' }); };
+    const old = await readRequest(request);
+    await new Promise<void>((resolve, reject) => { const tx = old.transaction(['entries', 'videos', 'captures', 'occurrences', 'meta'], 'readwrite');
+      tx.objectStore('entries').put(entry); tx.objectStore('videos').put({ id: 'video-a', url: context.url, title: 'Old video', updatedAt: 2 });
+      tx.objectStore('captures').put({ ...context, id: captureId, videoId: 'video-a' }); tx.objectStore('occurrences').put({ id: occurrenceId, entryId: entry.id, captureId, text: entry.text, translation: entry.translation, createdAt: 1 });
+      tx.objectStore('meta').put({ id: 'canonical-v2', at: 1 }); tx.oncomplete = () => resolve(); tx.onabort = () => reject(tx.error); }); old.close();
+    expect((await archive.canonicalDatabase()).version).toBe(3); expect((await book.queryEntries({ sourceId: 'video-a' })).entries[0]?.review).toEqual(entry.review);
+    const rows = await book.entryOccurrences(entry.id); expect(rows[0]?.id).toBe(occurrenceId); expect(rows[0]?.capture).toMatchObject({ id: captureId, sourceId: 'video-a', time: 1, source: { kind: 'video' } });
+  });
+  it('网页损坏备份全量拒绝，网页删除撤销与改名保留真实来源', async () => {
+    const saved = await book.saveEntry(webValue()); const backup = await book.exportBackup();
+    const invalid = structuredClone(backup); invalid.archive.captures[0]!.time = 0;
+    await expect(book.importBackup(invalid)).rejects.toThrow('网页来源不能'); expect((await book.entryOccurrences(saved.id))[0]?.capture.time).toBeUndefined();
+    const deletion = await book.deleteEntries([saved.id]); await book.undoDelete(deletion.undoToken);
+    const current = (await book.allEntries())[0]!; await book.saveEntry({ ...current, text: 'obscurity', lemma: 'obscurity' }, current.id);
+    expect((await book.entryOccurrences('word:obscurity'))[0]?.capture.source?.kind).toBe('web');
   });
 });
 

@@ -114,6 +114,7 @@ try {
   const network = page.getByLabel('联网翻译总开关');
   await page.waitForFunction(() => document.querySelector('flowword-ui')?.shadowRoot?.querySelector('.fw-network-setting input')?.checked === false);
   assert.equal(await network.isChecked(), false);
+  await page.getByText('发送范围与服务说明', { exact: true }).click();
   assert.match(await page.getByRole('dialog').innerText(), /可能长期保存/);
   await network.check();
   await page.waitForFunction(() => document.querySelector('flowword-ui')?.shadowRoot?.querySelector('.fw-network-setting input')?.checked === true);
@@ -123,6 +124,7 @@ try {
   const requests = await run.worker.evaluate(() => globalThis.translationRequests);
   assert.ok(requests.length >= 1);
   assert.match(await page.getByRole('dialog').innerText(), /形容词：鲜为人知的/);
+  await page.getByText('参考释义说明', { exact: true }).click();
   assert.match(await page.getByRole('dialog').innerText(), /未按当前语境消歧/);
   for (const request of requests) { assert.equal(request.origin, 'https://api.mymemory.translated.net'); assert.deepEqual(request.query.sort(), ['langpair', 'q']); assert.equal(request.credentials, 'omit'); assert.equal(request.referrer, 'no-referrer'); }
   await page.screenshot({ path: resolve('test-results/translation-v02.png') });

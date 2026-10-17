@@ -13,9 +13,12 @@ import { analyzeVocabulary } from '../src/core/vocabulary';
 import { getCuratedMeaning } from '../src/core/curated-meanings';
 import { enrichLearning, requestLearningMessage } from '../src/services/learning';
 import type { PageStatus, SubtitlePort, SubtitleSnapshot } from '../src/core/types';
-import { readSettings, STORAGE, writeAppearance, writeSetting } from '../src/storage/settings';
+import { readSettings, DEFAULT_SELECTION, STORAGE, writeAppearance, writeSetting } from '../src/storage/settings';
+import { readScope, scopeAllows } from '../src/storage/site-scope';
 import { FloatingApp } from '../src/ui/FloatingApp';
+import { SelectionApp } from '../src/ui/SelectionApp';
 import '../src/ui/floating.css';
+import '../src/ui/selection.css';
 
 export default defineContentScript({
   registration: 'runtime',   // 不设置 matches，避免 WXT 把全站匹配自动升级为必选权限
@@ -26,6 +29,7 @@ export default defineContentScript({
   async main(ctx) {
     if (window.top !== window) return;   // 跨域 iframe 播放器需要后续专用适配，不读取其他框架
     let settings = await readSettings();
+    settings.enabled = settings.enabled && scopeAllows(await readScope(), location.href);
     let settingsRevision = 0;
     if (ctx.isInvalid) return;
     const youtube = location.hostname === 'www.youtube.com';
@@ -71,6 +75,10 @@ export default defineContentScript({
       return { ...context, learning: { status: current.onlineTranslation ? 'loading' : 'disabled', candidates, timeline: subtitleTimeline(snapshot, context) } };
     }, 2500, enrichLearning);
     let root: Root | undefined;
+    let selectionRoot: Root | undefined;
+    let selectionMounted = false;
+    let selectionPageUrl = location.href;
+    let selectionPanel: { view: 'provider' | 'book' | 'scope'; revision: number } | undefined;
     let mounted = false;
     let currentVideoKey = pageKey();
     let sourceReadyKey = '';
@@ -222,7 +230,7 @@ export default defineContentScript({
 
     // render 意为刷新悬浮界面，无参数，挂载和外观配置变更时调用
     // 只把安全的学习状态及操作回调交给网页 UI，云端密钥不会传入组件
-    let requestedPanel: { view: 'provider' | 'book'; revision: number } | undefined;
+    let requestedPanel: { view: 'provider' | 'book' | 'scope'; revision: number } | undefined;
     function render() {
       root?.render(<FloatingApp controller={controller} settings={settings} requestedPanel={requestedPanel}
         onPosition={(position) => writeSetting('position', position)}
@@ -230,7 +238,11 @@ export default defineContentScript({
         onAppearance={writeAppearance}
         onOnlineTranslation={(value) => writeSetting('onlineTranslation', value)}
         onRepeat={repeatSentence} onFollow={startFollow} />);
+      renderSelection();
     }
+
+    // renderSelection 刷新普通网页选区组件，无参数，不依赖视频存在，不传递模型密钥
+    function renderSelection() { selectionRoot?.render(<SelectionApp enabled={settings.enabled && settings.selection?.enabled !== false} autoTranslate={settings.selection?.autoTranslate === true} pageUrl={selectionPageUrl} fontSize={settings.selection?.fontSize ?? DEFAULT_SELECTION.fontSize} theme={settings.selection?.theme ?? DEFAULT_SELECTION.theme} requestedPanel={selectionPanel} />); }
 
     const ui = await createShadowRootUi(ctx, {
       name: 'flowword-ui',
@@ -252,6 +264,16 @@ export default defineContentScript({
         root?.unmount();
         root = undefined;
       },
+    });
+
+    const selectionUi = await createShadowRootUi(ctx, {
+      name: 'flowword-selection-ui', position: 'inline', anchor: 'body',
+      css: await (await fetch(browser.runtime.getURL('/') + 'content-scripts/flowword.css')).text(),
+      isolateEvents: ['keydown', 'keyup', 'keypress', 'click', 'dblclick', 'contextmenu', 'mousedown', 'mouseup', 'pointerdown', 'pointerup'],
+      // onMount 在独立ShadowRoot挂载选区组件，container只属于本扩展，普通页面不能读取设置iframe
+      onMount(container) { const app = document.createElement('div'); container.append(app); selectionRoot = createRoot(app); renderSelection(); },
+      // onRemove 卸载选区监听及其网络订阅，无参数，视频UI自身关闭不会触发本组件卸载
+      onRemove() { selectionRoot?.unmount(); selectionRoot = undefined; },
     });
 
     // mediaChanged 意为处理播放来源或时间变化，event 为可选原生视频事件
@@ -295,6 +317,9 @@ export default defineContentScript({
     // 只在启用状态采样字幕，视频身份变化立即重置，失效会话不能重新挂载
     function reconcile() {
       if (ctx.isInvalid) return;
+      if (selectionPageUrl !== location.href) { selectionPageUrl = location.href; renderSelection(); }
+      if (settings.enabled && settings.selection?.enabled !== false && !selectionMounted) { selectionUi.mount(); selectionMounted = true; }
+      if ((!settings.enabled || settings.selection?.enabled === false) && selectionMounted) { selectionUi.remove(); selectionMounted = false; }
       const key = pageKey();
       const enabled = settings.enabled && Boolean(key);
       if (key !== currentVideoKey) {
@@ -316,8 +341,9 @@ export default defineContentScript({
       try {
         const next = await readSettings();
         if (ctx.isInvalid || revision !== settingsRevision) return;
-        settings = next;
+        settings = { ...next, enabled: next.enabled && scopeAllows(await readScope(), location.href) };
         reconcile();
+        renderSelection();
         render();
         void refreshProvider();
       } catch (error) { console.warn('FlowWord 设置读取失败', error); }
@@ -340,8 +366,9 @@ export default defineContentScript({
       }
       if (message.type === 'FLOWWORD_PING') return Promise.resolve({ type: 'FLOWWORD_STATUS', isVideoPage: Boolean(pageKey()), enabled: settings.enabled,
         phase: controller.getSnapshot().phase, version: browser.runtime.getManifest().version } satisfies PageStatus);
-      if (message.type === 'FLOWWORD_PANEL_OPEN' && 'view' in message && (message.view === 'provider' || message.view === 'book')) {
-        if (!settings.enabled || !mounted || !pageKey()) return Promise.resolve({ ok: false, error: '请先开启悬浮球并打开视频页面' });
+      if (message.type === 'FLOWWORD_PANEL_OPEN' && 'view' in message && (message.view === 'provider' || message.view === 'book' || message.view === 'scope')) {
+        if (!settings.enabled) return Promise.resolve({ ok: false, error: '请先在当前网页开启 FlowWord' });
+        if (!mounted || !pageKey()) { selectionPanel = { view: message.view, revision: (selectionPanel?.revision ?? 0) + 1 }; renderSelection(); return Promise.resolve({ ok: true }); }
         requestedPanel = { view: message.view, revision: (requestedPanel?.revision ?? 0) + 1 };
         render(); return Promise.resolve({ ok: true });
       }
@@ -379,6 +406,7 @@ export default defineContentScript({
       unsubscribe(); replay.cancel();
       subtitles.reset();
       ui.remove();
+      selectionUi.remove();
     });
     const revision = ++settingsRevision;
     const latest = await readSettings();   // CSS 加载期间可能已经开关插件，注册监听后重新读取补齐初始化窗口

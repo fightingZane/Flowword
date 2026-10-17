@@ -4,11 +4,12 @@ import type { WordbookEntry } from '../core/types';
 import './review-session.css';
 
 interface ReviewCard { entry: WordbookEntry; contexts?: { translation: string; capture: WordbookEntry['contexts'][number] }[] }
-interface Props { videoId?: string; onClose(): void; onUpdated?(): void }
+interface Props { sourceId?: string; sourceKind?: 'video' | 'web'; videoId?: string; onClose(): void; onUpdated?(): void }
 
-// ReviewSession 表示无模型费用的回忆练习，videoId 可限制视频，onClose 返回词本
-// onUpdated 在评分成功后通知父列表，中文默认隐藏，评分只更新本地复习计划
-export function ReviewSession({ videoId, onClose, onUpdated }: Props) {
+// ReviewSession 表示本地回忆练习，sourceId 限定来源，sourceKind 限定视频或网页
+// videoId 兼容旧调用，onClose 返回词本，onUpdated 在评分成功后通知父列表
+// 中文默认隐藏，评分只更新本地计划，不调用模型，也不会自动控制网页视频
+export function ReviewSession({ sourceId, sourceKind, videoId, onClose, onUpdated }: Props) {
   const [cards, setCards] = useState<ReviewCard[]>([]);
   const [position, setPosition] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -19,15 +20,16 @@ export function ReviewSession({ videoId, onClose, onUpdated }: Props) {
   const operation = useRef(0);
   const repeated = useRef(new Set<string>());
   const completedIds = useRef(new Set<string>());
+  const selectedSource = sourceId ?? videoId;
   useEffect(() => {
     const request = ++operation.current; repeated.current.clear(); completedIds.current.clear(); setCards([]); setLoading(true); setError(''); setPosition(0); setCompleted(0); setRevealed(false);
-    void browser.runtime.sendMessage({ type: 'FLOWWORD_REVIEW_DUE', query: { videoId, limit: 10 } }).then((result) => {
+    void browser.runtime.sendMessage({ type: 'FLOWWORD_REVIEW_DUE', query: { sourceId: selectedSource, sourceKind, limit: 10 } }).then((result) => {
       if (!result?.ok) throw new Error(result?.error || '复习资料读取失败');
       if (request === operation.current) setCards(result.cards || []);
     }).catch((failure) => { if (request === operation.current) setError(failure instanceof Error ? failure.message : '复习读取失败'); })
       .finally(() => { if (request === operation.current) setLoading(false); });
     return () => { operation.current++; };
-  }, [videoId]);
+  }, [selectedSource, sourceKind]);
   const card = cards[position];
   const occurrence = card?.contexts?.[0];
   const context = occurrence?.capture || card?.entry.contexts.at(-1);
@@ -57,7 +59,7 @@ export function ReviewSession({ videoId, onClose, onUpdated }: Props) {
     {loading ? <p role="status">正在准备复习…</p> : card ? <>
       <div className="fw-review-progress"><span>第 {position + 1} / {cards.length} 条</span><span>先想一想，再查看答案</span></div>
       <article className="fw-review-card"><span className="fw-review-kind">{card.entry.kind === 'word' ? '单词' : card.entry.kind === 'phrase' ? '表达' : '整句'}</span><h3 lang="en">{card.entry.text}</h3>
-        {context && <>{context.sentence !== card.entry.text && <p lang="en" className="fw-review-sentence">{context.sentence}</p>}<button type="button" className="fw-review-listen" onClick={() => void replay()}>听原句 ↗</button></>}
+        {context && <>{context.sentence !== card.entry.text && <p lang="en" className="fw-review-sentence">{context.sentence}</p>}<button type="button" className="fw-review-listen" onClick={() => void replay()}>{context.source?.kind === 'web' ? '回到原文 ↗' : '听原句 ↗'}</button></>}
         {revealed ? <div className="fw-review-answer"><strong>{occurrence?.translation || card.entry.translation || '暂无释义，可返回词本补充'}</strong>{context?.translation && <p>{context.translation}</p>}</div> : <button className="fw-review-reveal" type="button" onClick={() => setRevealed(true)}>查看中文答案</button>}
       </article>
       {revealed && <div className="fw-review-grades"><button type="button" disabled={busy} onClick={() => void grade('forgot')}>忘了</button><button type="button" disabled={busy} onClick={() => void grade('uncertain')}>有点模糊</button><button type="button" disabled={busy} onClick={() => void grade('remember')}>记住了</button></div>}

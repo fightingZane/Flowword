@@ -1,0 +1,19 @@
+.fw-word-lookup { color:var(--fw-ink); width:100%; min-width:0; }
+.fw-word-lookup header,.fw-lookup-title { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.fw-word-lookup h2 { margin:0; font-size:1.25em; font-weight:500; }
+.fw-word-lookup header p,.fw-word-lookup small,.fw-lookup-hint,.fw-lookup-sources h3 span { color:var(--fw-muted); font-size:.8em; }
+.fw-word-lookup button { color:var(--fw-green); background:var(--fw-wash); border:1px solid var(--fw-line); border-radius:8px; padding:8px 11px; font:inherit; font-size:.82em; cursor:pointer; }
+.fw-word-lookup button:disabled { opacity:.5; cursor:wait; }
+.fw-word-lookup form { margin:20px 0; display:grid; gap:8px; }
+.fw-word-lookup label { font-size:.85em; }
+.fw-lookup-input { display:flex; gap:8px; }
+.fw-lookup-input input { min-width:0; flex:1; border:1px solid var(--fw-line); border-radius:9px; background:var(--fw-wash); color:var(--fw-ink); padding:11px; font:inherit; }
+.fw-word-lookup input:focus-visible,.fw-word-lookup button:focus-visible { outline:2px solid var(--fw-green); outline-offset:2px; }
+.fw-word-lookup h3 { margin:12px 0; font-size:1.1em; font-weight:500; }
+.fw-word-lookup h4 { margin:22px 0 10px; font-size:.8em; color:var(--fw-muted); }
+.fw-word-lookup p { line-height:1.65; overflow-wrap:anywhere; white-space:pre-wrap; }
+.fw-word-lookup blockquote { margin:12px 0; border-left:2px solid var(--fw-line); padding:1px 14px; }
+.fw-word-lookup blockquote p + p { color:var(--fw-muted); font-size:.88em; }
+.fw-lookup-sources { margin-top:24px; border-top:1px solid var(--fw-line); padding-top:10px; }
+.fw-lookup-sources article { padding:10px 0 16px; border-bottom:1px solid var(--fw-line); }
+.fw-lookup-sources button { max-width:100%; overflow-wrap:anywhere; text-align:left; }

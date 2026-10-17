@@ -64,3 +64,20 @@ h1 span { color: #a6c78f; }
 footer { border-color: #405542; }
 footer button { color: #bdd6ab; }
 .error { color: #edb08d; }
+
+/* 第二版工具栏统一暗绿阅读主题，原授权、开关和入口保持 */
+:root { background: #101d19; color: #edf3ed; }
+.popup { padding: 24px; }
+.logo { background: #b9dec5; color: #173526; border-radius: 10px; }
+.intro { padding: 24px 0; }
+.eyebrow { display: none; }
+h1 { font-size: 30px; line-height: 1.35; font-weight: 500; margin: 0 0 16px; }
+h1 span { color: #b9dec5; }
+.intro p, .page-hint, .howto p { color: #adbeaf; }
+.switch-card { background: #192923; border-color: #34483e; border-radius: 12px; }
+.switch-card.enabled button { background: #8dbb9a; }
+.switch-card button > span { background: #edf3ed; }
+footer { border-color: #34483e; }
+footer button { color: #b9dec5; padding: 7px 0; margin-bottom: 5px; }
+footer > span { display: none; }
+.version { border-color: #34483e; }

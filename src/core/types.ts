@@ -58,7 +58,9 @@ export interface BallPosition {
 export interface Point { x: number; y: number }
 export interface Viewport { width: number; height: number }
 
+export interface SelectionSettings { enabled: boolean; autoTranslate: boolean; fontSize: number; theme: Theme }
 export interface Settings {
+  selection?: SelectionSettings;
   enabled: boolean;
   position: BallPosition;
   offset: number;
@@ -91,7 +93,21 @@ export interface WordbookEntry {
   updatedAt: number;
   status?: LearningStatus;
   review?: ReviewState;
-  contexts: { sentence: string; url: string; time: number; title?: string; videoKey?: string; end?: number; translation?: string; thumbnail?: string }[];
+  contexts: LearningContext[];
+}
+
+export type SourceKind = 'video' | 'web';
+export interface SourceQuote { exact: string; prefix?: string; suffix?: string }
+export interface LearningContext {
+  sentence: string;
+  url: string;
+  source?: { kind: SourceKind; quote?: SourceQuote };   // 旧资料缺失时只按视频处理，网页必须明确标记
+  time?: number;   // 网页没有视频时间，禁止用零秒占位
+  title?: string;
+  videoKey?: string;
+  end?: number;
+  translation?: string;
+  thumbnail?: string;
 }
 
 export type LearningStatus = 'new' | 'learning' | 'mastered';
@@ -112,6 +128,8 @@ export interface EntryQuery {
   tag?: string;
   status?: LearningStatus | '';
   videoId?: string;
+  sourceId?: string;
+  sourceKind?: SourceKind;
   sort?: 'recent' | 'alphabet' | 'kind' | 'time';
   offset?: number;
   limit?: number;

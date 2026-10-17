@@ -6,6 +6,15 @@ import { prefetchItems } from '../src/adapters/html5-subtitles';
 import { assembleSentence } from '../src/core/sentence';
 import { enrichLearning, learningContext, requestLearningMessage } from '../src/services/learning';
 const context = { text: 'a telephoto lens', segments: [], selected: {text:'a telephoto lens',start:0,end:3,source:'generic-track',language:'en'}, targetTime:1, learning: { status: 'loading', candidates: [] } } as unknown as SentenceContext;
+
+it('CLI模式也展示语境表达且不发自动预译', async () => {
+  mocks.send.mockClear();
+  mocks.send.mockImplementation((message) => Promise.resolve(message.type === 'FLOWWORD_PROVIDER_PUBLIC' ? { ok: true, mode: 'codex-cli', prefetch: true } : message.type === 'FLOWWORD_TRANSLATE' ? { ok: true, translation: '一个长焦镜头', provider: 'codex-cli' } : { ok: true, expressions: [{ text: 'telephoto lens', meaning: '长焦镜头' }] }));
+  const result = await enrichLearning(context, new AbortController().signal);
+  expect(result.learning?.translation).toBe('一个长焦镜头');
+  expect(result.learning?.expressions).toMatchObject([{ text: 'telephoto lens' }]);
+  expect(mocks.send.mock.calls.some((call) => call[0].type === 'FLOWWORD_PREFETCH')).toBe(false);
+});
 describe('整句优先与取消旧结果', () => {
   it('表达仍在处理时已经展示整句译文', async () => {
     let finish: (value: unknown) => void = () => {};

@@ -142,7 +142,7 @@ try {
 
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.screenshot({ path: resolve('test-results/floating-dark.png') });
-  assert.equal(await dialog().evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(32, 43, 37)');
+  assert.equal(await dialog().evaluate((node) => getComputedStyle(node).backgroundColor), 'rgb(25, 41, 35)');
   await page.emulateMedia({ colorScheme: 'light' });
   log('深浅主题跟随系统');
 
@@ -192,7 +192,8 @@ try {
   await ready();
   assert.match(await dialog().innerText(), /A verified English track\./);
   assert.doesNotMatch(await dialog().innerText(), /CHAPTER METADATA/);
-  assert.match(await dialog().innerText(), /来自视频的英文字幕轨道/);
+  await page.getByText('字幕来源', { exact: true }).click();
+  assert.match(await dialog().innerText(), /视频英文字幕轨道/);
   await page.getByRole('button', { name: '完成', exact: true }).click();
   await idle();
   log('标准英文字幕轨道优先，WebVTT 标签解析正确，metadata 被排除');

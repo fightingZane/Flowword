@@ -53,7 +53,7 @@ try {
   await page.getByRole('button', { name: '撤销删除', exact: true }).click(); await page.getByText('已恢复 3 条收藏', { exact: true }).waitFor(); await page.waitForFunction(() => document.querySelectorAll('.book-card').length === 3);
   log('学习状态筛选、批量分类及删除撤销完整恢复');
   await page.getByLabel('视频分组').selectOption({ label: 'Camera principles' }); const videoBackup = await exported('导出当前视频');
-  assert.equal(videoBackup.archive.videos.length, 1); assert.equal(videoBackup.entries.length, 3); assert.ok(videoBackup.archive.captures.every((capture) => capture.url.includes('youtube.com')));
+  assert.equal(videoBackup.archive.sources.length, 1); assert.equal(videoBackup.entries.length, 3); assert.ok(videoBackup.archive.captures.every((capture) => capture.url.includes('youtube.com')));
   log('按当前视频导出，只包含该视频语境');
   await page.getByLabel('视频分组').selectOption('');
   const fetchesBefore = await run.worker.evaluate(() => globalThis.reviewFetchCount = 0);

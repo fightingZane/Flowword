@@ -3,12 +3,15 @@
 ## 安装与项目首页
 
 - [项目介绍与界面预览](../README.md)
+- [功能手册与入口操作表](FEATURES.md)
 - [安装、升级和模型配置](../INSTALL.md)
 - [更新记录](../CHANGELOG.md)
 - [测试报告与验证边界](../TEST_REPORT.md)
 
 ## 开发与维护
 
+- [0.9 网站范围与查词](changes/0.9.md)
+- [0.8 多后端与CLI接入](changes/0.8.md)
 - [开发和目录说明](DEVELOPMENT.md)
 - [手动同步 GitHub](GITHUB_SYNC.md)
 - [系统架构](ARCHITECTURE.md)
@@ -30,3 +33,5 @@
 
 - [0.6.1 修改说明](changes/0.6.1.md)
 - [网页划词翻译待审核方案](plans/web-selection-translation.md)
+
+- [0.7 新版界面与网页划词](changes/0.7.md)

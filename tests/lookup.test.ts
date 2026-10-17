@@ -1,0 +1,15 @@
+import { describe, expect, it, vi } from 'vitest';
+import { lookupText, parseLookup, requestLookup } from '../src/services/lookup';
+import { DEFAULT_PROVIDER } from '../src/storage/provider';
+const result = { translation: '均热板：一种用于电子设备散热的结构', examples: [{ sentence: 'This vapor chamber keeps the chip cool.', translation: '这块均热板让芯片保持低温' }] };
+const config = { ...DEFAULT_PROVIDER, mode: 'cloud' as const, apiKey: 'test-secret', model: 'mock', endpoint: 'https://api.example/v1/chat/completions' };
+describe('显式查词协议与例句边界', () => {
+  it('拒绝空白、过长、中文和HTML输入', () => { for (const value of ['', 'a'.repeat(151), '你好', '<script>evil</script>']) expect(() => lookupText(value)).toThrow(); expect(lookupText(' vapor   chamber ')).toBe('vapor chamber'); });
+  it('标注AI例句且不保留模型伪造来源', () => { const parsed = parseLookup({ ...result, url: 'https://fake.example' }); expect(parsed.exampleSource).toBe('ai-generated'); expect(parsed).not.toHaveProperty('url'); });
+  it('拒绝空例句、超数量、非中文释义和混入HTML', () => { for (const value of [null, { ...result, translation: '123' }, { ...result, examples: [] }, { ...result, examples: Array(4).fill(result.examples[0]) }, { ...result, examples: [{ sentence: '<b>vapor chamber</b>', translation: '均热板' }] }]) expect(() => parseLookup(value)).toThrow(); });
+  it('Chat只发查询文本并保护密钥和跳转', async () => { const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(result) } }] }) }); expect(await requestLookup(config, 'vapor chamber', undefined, fetcher)).toMatchObject(result); const init = fetcher.mock.calls[0]![1]; expect(init.body).not.toContain(config.apiKey); expect(init.redirect).toBe('error'); expect(init.credentials).toBe('omit'); expect(JSON.parse(init.body).messages[1].content).toBe(JSON.stringify({ text: 'vapor chamber' })); });
+  it('Responses复用结构验证且不启用远程存储', async () => { const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'completed', output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: JSON.stringify(result) }] }] }) }); await requestLookup({ ...config, protocol: 'responses' }, 'vapor chamber', undefined, fetcher); expect(JSON.parse(fetcher.mock.calls[0]![1].body)).toMatchObject({ store: false, input: JSON.stringify({ text: 'vapor chamber' }) }); });
+  it('CLI只允许固定桥接且不自动退回云端', async () => { const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => result }); await requestLookup({ ...config, mode: 'codex-cli', endpoint: 'http://127.0.0.1:17863/', apiKey: 'a'.repeat(64) }, 'vapor chamber', undefined, fetcher); expect(JSON.parse(fetcher.mock.calls[0]![1].body)).toMatchObject({ task: 'lookup', sentence: 'vapor chamber', context: [] }); await expect(requestLookup({ ...config, mode: 'mymemory' }, 'test', undefined, fetcher)).rejects.toThrow(); expect(fetcher).toHaveBeenCalledTimes(1); });
+  it('HTTP错误不暴露服务响应或密钥', async () => { const fetcher = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: config.apiKey }) }); await expect(requestLookup(config, 'test', undefined, fetcher)).rejects.toThrow('HTTP 401'); });
+});
+

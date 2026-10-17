@@ -1,17 +1,64 @@
-import type { EntryPatch, ReviewState, WordbookEntry } from '../core/types';
+import type { EntryPatch, LearningContext, ReviewState, SourceQuote, WordbookEntry } from '../core/types';
 
 export const BACKUP_LIMITS = { entries: 50000, captures: 100000, occurrences: 200000, videos: 50000, labels: 1000, bytes: 64 * 1024 * 1024 } as const;
 
 // safeSourceUrl 检查value来源地址，只返回无凭据的HTTP或HTTPS地址
-// 备份和页面来源共用此规则，不会发起网络请求，非法输入返回undefined
-export function safeSourceUrl(value: unknown): string | undefined {
+// 备份和页面来源共用此规则，keepHash为true保留网页路由与章节，不发起网络请求
+export function safeSourceUrl(value: unknown, keepHash = false): string | undefined {
   if (typeof value !== 'string' || value.length > 2000) return;
   try {
     const url = new URL(value);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return;
-    url.hash = '';
+    if (!keepHash) url.hash = '';
     return url.href;
   } catch { return; }
+}
+
+// sourceKind 读取context来源类型，旧资料没有source字段时按video处理
+// source字段一旦提供就必须明确合法kind，不能把损坏网页来源误当视频
+export function sourceKind(context: LearningContext): 'video' | 'web' {
+  if (context.source === undefined) return 'video';
+  if (!context.source || !['video', 'web'].includes(context.source.kind)) throw new Error('来源类型无效');
+  return context.source.kind;
+}
+
+// validateQuote 复制value文字定位资料，exact为真实选文，前后文最多各五百字符
+// 缺失时允许只保存网页原链接，不保存DOM路径或整页正文，不承诺页面改版后仍能定位
+function validateQuote(value: unknown): SourceQuote | undefined {
+  if (value === undefined) return;
+  if (!value || typeof value !== 'object') throw new Error('网页选文定位无效');
+  const quote = value as SourceQuote;
+  if (typeof quote.exact !== 'string' || !quote.exact.trim() || quote.exact.length > 2000 ||
+    (quote.prefix !== undefined && (typeof quote.prefix !== 'string' || quote.prefix.length > 500)) ||
+    (quote.suffix !== undefined && (typeof quote.suffix !== 'string' || quote.suffix.length > 500))) throw new Error('网页选文定位无效或超过上限');
+  return { exact: quote.exact, ...(quote.prefix !== undefined ? { prefix: quote.prefix } : {}), ...(quote.suffix !== undefined ? { suffix: quote.suffix } : {}) };
+}
+
+// validateContext 校验raw真实来源，strict决定旧资料非法来源是否直接报错
+// 网页不能带time/end/videoKey，视频必须有有限非负秒数，返回值只复制白名单字段
+export function validateContext(raw: LearningContext, strict = false): LearningContext | undefined {
+  if (!raw || typeof raw !== 'object') { if (strict) throw new Error('词条语境无效'); return; }
+  const kind = sourceKind(raw);
+  if (kind === 'web' && (raw.time !== undefined || raw.end !== undefined || raw.videoKey !== undefined)) throw new Error('网页来源不能包含视频时间或媒体标识');
+  if (typeof raw.sentence !== 'string' || !raw.sentence.trim() || raw.sentence.length > 2000 || !safeSourceUrl(raw.url, kind === 'web') ||
+    (kind === 'video' && (typeof raw.time !== 'number' || !Number.isFinite(raw.time) || raw.time < 0 || (raw.end !== undefined && (!Number.isFinite(raw.end) || raw.end < raw.time)))) ||
+    (raw.title !== undefined && (typeof raw.title !== 'string' || raw.title.length > 300)) ||
+    (raw.videoKey !== undefined && (typeof raw.videoKey !== 'string' || raw.videoKey.length > 2000)) ||
+    (strict && raw.thumbnail !== undefined && !safeSourceUrl(raw.thumbnail)) ||
+    (raw.translation !== undefined && (typeof raw.translation !== 'string' || raw.translation.length > 6000))) {
+    if (strict || kind === 'web') throw new Error('词条语境无效'); return;
+  }
+  const quote = kind === 'web' ? validateQuote(raw.source?.quote) : undefined;
+  return { sentence: raw.sentence, url: safeSourceUrl(raw.url, kind === 'web')!, source: { kind, ...(quote ? { quote } : {}) },
+    ...(kind === 'video' ? { time: raw.time, ...(raw.videoKey !== undefined ? { videoKey: raw.videoKey } : {}), ...(raw.end !== undefined ? { end: raw.end } : {}) } : {}),
+    ...(raw.title !== undefined ? { title: raw.title } : {}), ...(raw.translation !== undefined ? { translation: raw.translation } : {}), ...(safeSourceUrl(raw.thumbnail) ? { thumbnail: safeSourceUrl(raw.thumbnail)! } : {}) };
+}
+
+// contextIdentity 为context生成摘要去重键，网页采用URL和选文前后文，不伪造零秒
+// 视频保留原URL媒体键时间原句组合，网页重复句可由quote前后文区分
+export function contextIdentity(context: LearningContext): string {
+  return sourceKind(context) === 'web' ? JSON.stringify(['web', context.url, context.sentence, context.source?.quote])
+    : JSON.stringify(['video', context.url, context.videoKey, context.time, context.sentence]);
 }
 
 // labelList 校验value标签数组并去重，strict用于整份备份预校验，不允许静默丢标签
@@ -59,17 +106,7 @@ export function validateEntry(value: unknown, preserveTimes = false, strict = fa
   if (entry.contexts !== undefined && (!Array.isArray(entry.contexts) || entry.contexts.length > BACKUP_LIMITS.captures)) throw new Error('词条语境无效或超过上限');
   const contexts: WordbookEntry['contexts'] = [];
   for (const raw of entry.contexts ?? []) {
-    if (!raw || typeof raw !== 'object' || typeof raw.sentence !== 'string' || !raw.sentence.trim() || raw.sentence.length > 2000 || !safeSourceUrl(raw.url) || !Number.isFinite(raw.time) || raw.time < 0 ||
-      (raw.end !== undefined && (!Number.isFinite(raw.end) || raw.end < raw.time)) ||
-      (raw.title !== undefined && (typeof raw.title !== 'string' || raw.title.length > 300)) ||
-      (raw.videoKey !== undefined && (typeof raw.videoKey !== 'string' || raw.videoKey.length > 2000)) ||
-      (strict && raw.thumbnail !== undefined && !safeSourceUrl(raw.thumbnail)) ||
-      (raw.translation !== undefined && (typeof raw.translation !== 'string' || raw.translation.length > 6000))) {
-      if (strict) throw new Error('词条语境无效');
-      continue;
-    }
-    contexts.push({ sentence: raw.sentence, url: safeSourceUrl(raw.url)!, time: raw.time, ...(raw.title !== undefined ? { title: raw.title } : {}),
-      ...(raw.videoKey !== undefined ? { videoKey: raw.videoKey } : {}), ...(raw.end !== undefined ? { end: raw.end } : {}), ...(raw.translation !== undefined ? { translation: raw.translation } : {}), ...(safeSourceUrl(raw.thumbnail) ? { thumbnail: safeSourceUrl(raw.thumbnail)! } : {}) });
+    const context = validateContext(raw, strict); if (context) contexts.push(context);
   }
   const canonical = entry.lemma?.trim() || entry.text;
   const now = Date.now();
@@ -84,7 +121,7 @@ export function validateEntry(value: unknown, preserveTimes = false, strict = fa
 // contexts仅作为最近八条摘要，完整语境由同一事务中的occurrences保存，不以摘要覆盖历史
 export function mergeEntries(previous: WordbookEntry | undefined, next: WordbookEntry): WordbookEntry {
   if (!previous) return next;
-  const contexts = [...previous.contexts, ...next.contexts].filter((context, index, values) => values.findIndex((item) => item.url === context.url && item.videoKey === context.videoKey && item.time === context.time && item.sentence === context.sentence) === index).slice(-8);
+  const contexts = [...previous.contexts, ...next.contexts].filter((context, index, values) => values.findIndex((item) => contextIdentity(item) === contextIdentity(context)) === index).slice(-8);
   const examTags = [...new Set([...previous.examTags, ...next.examTags])];
   const tags = [...new Set([...previous.tags, ...next.tags])];
   if (examTags.length > BACKUP_LIMITS.labels || tags.length > BACKUP_LIMITS.labels) throw new Error('合并后的标签超过统一上限，请先整理标签，尚未修改资料');

@@ -10,17 +10,17 @@ const prefix = 'flowword-settings-grant:';
 export async function handleSettingsAccess(message: { type?: string; token?: string }, sender: SettingsSender): Promise<object | undefined> {
   if (!['FLOWWORD_SETTINGS_EMBED_CREATE', 'FLOWWORD_SETTINGS_EMBED_CHECK', 'FLOWWORD_SETTINGS_EMBED_REVOKE'].includes(message.type || '')) return;
   const tabId = sender.tab?.id;
-  if (tabId === undefined) return { ok: false, error: '设置会话必须从视频悬浮框打开' };
+  if (tabId === undefined) return { ok: false, error: '设置会话必须从FlowWord面板打开' };
   if (message.type === 'FLOWWORD_SETTINGS_EMBED_CREATE') {
     if (sender.frameId !== 0 || !/^https?:\/\//.test(sender.url || '')) return { ok: false, error: '无效设置入口' };
     const enabled = (await browser.storage.local.get(STORAGE.enabled))[STORAGE.enabled] === true;
     const origin = new URL(sender.url!).origin;
-    if (!enabled || (origin !== 'https://www.youtube.com' && !await browser.permissions.contains({ origins: [origin + '/*'] }))) return { ok: false, error: '请先在当前视频站点启用悬浮球' };
+    if (!enabled || (origin !== 'https://www.youtube.com' && !await browser.permissions.contains({ origins: [origin + '/*'] }))) return { ok: false, error: '请先在当前网站启用FlowWord' };
     const token = crypto.randomUUID();
     await browser.storage.session.set({ [prefix + token]: { tabId, expires: Date.now() + 2 * 60_000 } satisfies EmbedGrant });
     return { ok: true, token };
   }
-  if (typeof message.token !== 'string' || !/^[a-f0-9-]{36}$/i.test(message.token)) return { ok: false, error: '请从悬浮球重新打开模型设置' };
+  if (typeof message.token !== 'string' || !/^[a-f0-9-]{36}$/i.test(message.token)) return { ok: false, error: '请从FlowWord面板重新打开模型设置' };
   const key = prefix + message.token;
   const grant = (await browser.storage.session.get(key))[key] as EmbedGrant | undefined;
   if (!grant || grant.tabId !== tabId) return { ok: false, error: '设置会话不属于当前标签页' };
@@ -28,7 +28,7 @@ export async function handleSettingsAccess(message: { type?: string; token?: str
     if (sender.frameId !== 0 || !/^https?:\/\//.test(sender.url || '')) return { ok: false, error: '无效设置入口' };
     await browser.storage.session.remove(key); return { ok: true };
   }
-  if (grant.expires < Date.now() || !sender.url?.startsWith(browser.runtime.getURL('/settings.html')) || !sender.frameId || (grant.frameId !== undefined && grant.frameId !== sender.frameId)) return { ok: false, error: '设置会话已过期，请从悬浮球重新打开' };
+  if (grant.expires < Date.now() || !sender.url?.startsWith(browser.runtime.getURL('/settings.html')) || !sender.frameId || (grant.frameId !== undefined && grant.frameId !== sender.frameId)) return { ok: false, error: '设置会话已过期，请从FlowWord面板重新打开' };
   await browser.storage.session.set({ [key]: { ...grant, frameId: sender.frameId, expires: Date.now() + 60 * 60_000 } });
   return { ok: true };
 }

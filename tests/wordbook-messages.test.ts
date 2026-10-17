@@ -47,11 +47,13 @@ describe('词本消息授权、原子接口路由和变更广播', () => {
   it('扩展页面各RPC使用固定参数，不再循环逐条恢复备份', async () => {
     await handleWordbookMessage({ type: 'FLOWWORD_BOOK_SUMMARY' }, extension); expect(mocks.summary).toHaveBeenCalledOnce();
     await handleWordbookMessage({ type: 'FLOWWORD_BOOK_OCCURRENCES', id: 'word:test', videoId: 'video-a' }, extension); expect(mocks.occurrences).toHaveBeenCalledWith('word:test', 'video-a');
+    await handleWordbookMessage({ type: 'FLOWWORD_BOOK_OCCURRENCES', id: 'word:test', sourceId: 'web:https://example.test/article' }, extension); expect(mocks.occurrences).toHaveBeenCalledWith('word:test', 'web:https://example.test/article');
     await handleWordbookMessage({ type: 'FLOWWORD_OCCURRENCE_UPDATE', id: 'row', translation: '语境义' }, extension); expect(mocks.occurrence).toHaveBeenCalledWith('row', '语境义');
     await handleWordbookMessage({ type: 'FLOWWORD_BOOK_BATCH', ids: ['word:test'], patch: { status: 'learning' } }, extension); expect(mocks.batch).toHaveBeenCalledWith(['word:test'], { status: 'learning' });
     expect(await handleWordbookMessage({ type: 'FLOWWORD_BOOK_DELETE', id: 'word:test' }, extension)).toMatchObject({ ok: true, undoToken: 'token' });
     await handleWordbookMessage({ type: 'FLOWWORD_BOOK_UNDO', token: 'token' }, extension); expect(mocks.undo).toHaveBeenCalledWith('token');
     await handleWordbookMessage({ type: 'FLOWWORD_BOOK_EXPORT', query: { videoId: 'video-a' } }, extension); expect(mocks.export).toHaveBeenCalledWith({ videoId: 'video-a' });
+    await handleWordbookMessage({ type: 'FLOWWORD_BOOK_EXPORT', query: { sourceKind: 'web', sourceId: 'web:https://example.test/article' } }, extension); expect(mocks.export).toHaveBeenCalledWith({ sourceKind: 'web', sourceId: 'web:https://example.test/article' });
     const backup = { version: 3, entries: [] }; await handleWordbookMessage({ type: 'FLOWWORD_BOOK_IMPORT', backup }, extension); expect(mocks.import).toHaveBeenCalledWith(backup);
   });
 });

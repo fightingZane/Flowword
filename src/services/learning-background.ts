@@ -3,6 +3,7 @@ import { STORAGE } from '../storage/settings';
 import { cachedTranslation, cacheTranslation, DEFAULT_PROVIDER, readProvider, type ProviderConfig } from '../storage/provider';
 import { parseCloudOutput, requestCloud, type ContextExpression } from './cloud';
 import { requestTranslation, splitTranslation } from './translation';
+import { requestCodex } from './codex-cli';
 import { RequestScheduler } from './request-scheduler';
 export interface LearningResult { translation?: string; expressions?: ContextExpression[]; segmented?: boolean; provider?: string; cached?: boolean; shared?: boolean; skipped?: boolean; budgetExceeded?: boolean; contextUnavailable?: boolean; elapsedMs?: number; status?: 'cached' | 'ready' | 'skipped'; cacheWarning?: boolean }
 interface SharedRequest { controller: AbortController; subscribers: Set<symbol>; promise: Promise<LearningResult> }
@@ -53,12 +54,12 @@ export async function learningRequest(sentence: string, context: string[], task:
   const started = Date.now(); if (signal?.aborted) throw abortError();
   if (typeof sentence !== 'string' || !sentence.trim() || sentence.length > 6000) throw new Error('字幕文本无效或过长');
   ({ sentence, context } = normalizeLearningInput(sentence, context)); const config = await effectiveProvider();
-  if (config.mode === 'cloud' && !config.apiKey) throw new Error('请在悬浮框模型设置中填写 DeepSeek API Key 并保存');
+  if ((config.mode === 'cloud' || config.mode === 'codex-cli') && !config.apiKey) throw new Error(config.mode === 'codex-cli' ? '请在模型设置中导入本机 CLI 连接文件并保存' : '请在悬浮框模型设置中填写 API Key 并保存');
   if (config.mode === 'off') throw new Error('请先在服务设置中启用翻译');
-  if (config.mode === 'cloud' && !await browser.permissions.contains({ origins: [new URL(config.endpoint).origin + '/*'] })) throw new Error('请在服务设置中授权接口访问');
-  if (priority === 'prefetch' && (!config.prefetch || (task === 'context' && config.prefetchExpressions !== true))) return { skipped: true, status: 'skipped' };
-  if (task === 'context' && config.mode !== 'cloud') return { provider: config.mode, expressions: [], contextUnavailable: true };
-  const key = JSON.stringify(['context-v4-quality', 'zh-CN', new URL(config.endpoint).hostname === 'api.deepseek.com' ? 'thinking-disabled' : 'provider-default', config.mode, config.endpoint, config.model, task, sentence, context]);
+  if ((config.mode === 'cloud' || config.mode === 'codex-cli') && !await browser.permissions.contains({ origins: [new URL(config.endpoint).origin + '/*'] })) throw new Error('请在服务设置中授权接口访问');
+  if (priority === 'prefetch' && (config.mode === 'codex-cli' || !config.prefetch || (task === 'context' && config.prefetchExpressions !== true))) return { skipped: true, status: 'skipped' };
+  if (task === 'context' && config.mode !== 'cloud' && config.mode !== 'codex-cli') return { provider: config.mode, expressions: [], contextUnavailable: true };
+  const key = JSON.stringify(['context-v4-quality', 'zh-CN', new URL(config.endpoint).hostname === 'api.deepseek.com' ? 'thinking-disabled' : 'provider-default', config.mode === 'cloud' && config.protocol === 'responses' ? 'cloud-responses' : config.mode, config.endpoint, config.model, task, sentence, context]);
   let cached: string | undefined;
   try { cached = await cachedTranslation(key); } catch { /* 缓存不可用仍可翻译 */ }
   if (signal?.aborted) throw abortError();
@@ -72,10 +73,11 @@ export async function learningRequest(sentence: string, context: string[], task:
     const latest = await effectiveProvider();
     if (controller.signal.aborted) throw abortError();
     if (priority === 'prefetch' && (!latest.prefetch || (task === 'context' && latest.prefetchExpressions !== true))) return { skipped: true, status: 'skipped' };
-    if (latest.mode !== config.mode || latest.endpoint !== config.endpoint || latest.model !== config.model || latest.apiKey !== config.apiKey) throw new Error('联网翻译已关闭或配置已改变');
-    if (config.mode === 'cloud' && !await browser.permissions.contains({ origins: [new URL(config.endpoint).origin + '/*'] })) throw new Error('接口访问权限已撤销');
+    if (latest.mode !== config.mode || latest.endpoint !== config.endpoint || latest.model !== config.model || latest.apiKey !== config.apiKey || latest.protocol !== config.protocol) throw new Error('联网翻译已关闭或配置已改变');
+    if ((config.mode === 'cloud' || config.mode === 'codex-cli') && !await browser.permissions.contains({ origins: [new URL(config.endpoint).origin + '/*'] })) throw new Error('接口访问权限已撤销');
     let result: LearningResult;
     if (config.mode === 'cloud') result = await requestCloud(config, sentence, context, task, fetch, controller.signal);
+    else if (config.mode === 'codex-cli') result = await requestCodex(config, sentence, context, task, fetch, controller.signal);
     else { const chunks = splitTranslation(sentence); result = { translation: (await Promise.all(chunks.map((chunk) => fallbackTranslation(chunk, controller.signal)))).join(' '), segmented: chunks.length > 1 }; }
     if (controller.signal.aborted) throw abortError();
     try { if (result.translation || result.expressions) await cacheTranslation(key, JSON.stringify(result)); } catch { result = { ...result, cacheWarning: true }; }

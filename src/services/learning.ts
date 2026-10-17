@@ -24,7 +24,8 @@ export async function enrichLearning(context: SentenceContext, signal: AbortSign
     const nearby = learningContext(context);
     const info = await browser.runtime.sendMessage({ type: 'FLOWWORD_PROVIDER_PUBLIC' });
     if (signal.aborted) return context;
-    current = { ...context, learning: { ...context.learning, provider: info.mode, translationState: task === 'context' ? context.learning.translationState : 'requesting', candidates: task === 'context' ? context.learning.candidates : info.mode === 'cloud' ? [] : context.learning.candidates, contextStatus: task === 'translate' ? context.learning.contextStatus : info.mode === 'cloud' ? 'loading' : 'ready' } };
+    const supportsContext = info.mode === 'cloud' || info.mode === 'codex-cli';
+    current = { ...context, learning: { ...context.learning, provider: info.mode, translationState: task === 'context' ? context.learning.translationState : 'requesting', candidates: task === 'context' ? context.learning.candidates : supportsContext ? [] : context.learning.candidates, contextStatus: task === 'translate' ? context.learning.contextStatus : supportsContext ? 'loading' : 'ready' } };
     // translationTask 独立整句任务，无参数，使用当前context文本，失败只更新译文错误
     const translationTask = (async () => {
       if (task === 'context') return;
@@ -39,7 +40,7 @@ export async function enrichLearning(context: SentenceContext, signal: AbortSign
     // expressionTask 独立词组任务，无参数，只有云模式运行，不能覆盖已经成功的整句字段
     const expressionTask = (async () => {
       if (task === 'translate') return;
-      if (info.mode !== 'cloud') { if (task === 'context') { current = { ...current, learning: { ...current.learning!, contextStatus: 'error', contextError: '请先配置并开启云端语境模型' } }; publish(); } return; }
+      if (!supportsContext) { if (task === 'context') { current = { ...current, learning: { ...current.learning!, contextStatus: 'error', contextError: '请先配置并开启云端语境模型' } }; publish(); } return; }
       try {
         const details = await requestLearningMessage({ type: 'FLOWWORD_CONTEXT', sentence: context.text, context: nearby }, signal);
         if (signal.aborted) return;

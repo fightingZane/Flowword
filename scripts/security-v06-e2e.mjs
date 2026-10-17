@@ -25,7 +25,7 @@ async function provider(value) {
 // rejectedFrame 断言selector嵌入入口拒绝挂载秘密表单与公开配置RPC，parent提供真实未授权网页
 async function rejectedFrame(parent, selector) {
   const frame = parent.frameLocator(selector);
-  await frame.getByRole('status').filter({ hasText: /悬浮球|标签页|设置会话/ }).waitFor();
+  await frame.getByRole('status').filter({ hasText: /FlowWord|标签页|设置会话/ }).waitFor();
   assert.equal(await frame.getByLabel('服务', { exact: true }).count(), 0);
   assert.equal(await frame.getByLabel('API Key').count(), 0);
   assert.equal(await frame.getByRole('button', { name: '授权接口并保存' }).count(), 0);

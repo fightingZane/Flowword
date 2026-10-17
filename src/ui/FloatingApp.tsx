@@ -22,7 +22,7 @@ interface Props {
   onOffset(offset: number): Promise<void>;
   onAppearance(appearance: Partial<Appearance>): Promise<void>;
   onOnlineTranslation(value: boolean): Promise<void>;
-  requestedPanel?: { view: 'provider' | 'book'; revision: number };
+  requestedPanel?: { view: 'provider' | 'book' | 'scope'; revision: number };
   onRepeat?(): Promise<void>;
   onFollow?(): Promise<void>;
 }
@@ -52,7 +52,7 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
   const [manualPoint, setManualPoint] = useState<Point | null>(null);
   const panelGesture = useRef<{ id: number; x: number; y: number; width: number; height: number; point: Point; resize: boolean } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [secondaryView, setSecondaryView] = useState<'provider' | 'book' | null>(null);
+  const [secondaryView, setSecondaryView] = useState<'provider' | 'book' | 'scope' | null>(null);
   useEffect(() => { if (requestedPanel) { setSecondaryView(requestedPanel.view); setSettingsOpen(false); } }, [requestedPanel?.revision]);
   const [draft, setDraft] = useState<WordbookEntry | null>(null);
   const [savedIds, setSavedIds] = useState<string[]>([]);
@@ -277,13 +277,13 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
         if (gesture?.id === event.pointerId && !gesture.resize) setManualPoint(boundPanel({ x: gesture.point.x + event.clientX - gesture.x, y: gesture.point.y + event.clientY - gesture.y }));
       }} onPointerUp={() => { panelGesture.current = null; }} onPointerCancel={() => { panelGesture.current = null; }}>
         <div className="fw-brand"><span className="fw-mini-mark"><FlowMark size={17} /></span><span>FlowWord</span><span className="fw-dot-separator">/</span><span className="fw-brand-caption">{secondaryView === 'provider' ? '模型设置' : secondaryView === 'book' ? '单词本' : settingsOpen ? '配置' : '这一句'}</span></div>
-        {!settingsOpen && !secondaryView && <button type="button" className="fw-header-config" onClick={() => setSecondaryView('book')}>单词本</button>}
-        {!settingsOpen && !secondaryView && <button type="button" className="fw-header-config" onClick={() => { setSecondaryView(null); setSettingsOpen(true); }}>配置</button>}
+        {!settingsOpen && !secondaryView && <button type="button" className="fw-header-config" onClick={() => setSecondaryView('book')}><Icon name="bookmark" size={15} />单词本</button>}
+        {!settingsOpen && !secondaryView && <button type="button" className="fw-header-config" onClick={() => { setSecondaryView(null); setSettingsOpen(true); }}><Icon name="settings" size={15} />配置</button>}
         <button type="button" data-close className="fw-icon-button" aria-label="关闭面板，保持视频暂停" title="关闭面板 · 保持暂停" onClick={close}><Icon name="close" size={16} /></button>
       </header>
 
       <ScrollArea busy={busy}>
-        {secondaryView === 'provider' ? <EmbeddedSettings /> : secondaryView === 'book' ? <QuickWordbook onOpenFull={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })} /> : settingsOpen ? <SettingsPanel onProvider={() => { setSettingsOpen(false); setSecondaryView('provider'); }} settings={settings} onAppearance={onAppearance} onError={flash} onOnline={async (value) => {
+        {secondaryView === 'scope' ? <EmbeddedSettings view="scope" /> : secondaryView === 'provider' ? <EmbeddedSettings /> : secondaryView === 'book' ? <QuickWordbook onOpenFull={() => void browser.runtime.sendMessage({ type: 'FLOWWORD_BOOK_OPEN' })} /> : settingsOpen ? <SettingsPanel onProvider={() => { setSettingsOpen(false); setSecondaryView('provider'); }} settings={settings} onAppearance={onAppearance} onError={flash} onOnline={async (value) => {
           await onOnlineTranslation(value);
           if (state.context) void controller.capture(settings.offset);
         }} /> : draft ? <SaveEntryForm draft={draft} onSave={save} onCancel={() => setDraft(null)} /> : <>
@@ -302,9 +302,9 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
               : state.context.learning.status === 'loading' ? <p className="fw-learning-note">正在准备这一句译文…</p>
               : state.context.learning.status === 'disabled' ? <p className="fw-learning-note">联网翻译尚未开启 <button type="button" onClick={() => setSettingsOpen(true)}>右键配置 / 开启翻译</button></p>
               : <p className="fw-learning-note" role="status">{state.context.learning.error || '暂没有可用译文'}</p>}
-            <div className="fw-translation-label">当前句译文 <span>{state.context.learning.cached ? '缓存命中' : state.context.learning.status === 'loading' ? '正在准备' : state.context.learning.status === 'error' ? '请求失败' : state.context.learning.provider || '参考翻译'}{state.context.learning.elapsedMs !== undefined ? ` · ${state.context.learning.elapsedMs} ms` : ''}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div>
+            <details className="fw-result-details"><summary>译文详情</summary><div className="fw-translation-label">当前句译文 <span>{state.context.learning.cached ? '缓存命中' : state.context.learning.status === 'loading' ? '正在准备' : state.context.learning.status === 'error' ? '请求失败' : state.context.learning.provider || '参考翻译'}{state.context.learning.elapsedMs !== undefined ? ` · ${state.context.learning.elapsedMs} ms` : ''}{state.context.learning.segmented ? ' · 分段译文' : ''}</span></div></details>
           </div>}
-          {state.context.learning?.provider === 'mymemory' && <p className="fw-context-note">MyMemory 参考机译 · 无语境分析 <button type="button" onClick={() => { setSecondaryView('provider'); setSettingsOpen(false); }}>配置语境模型 ↗</button></p>}
+          {state.context.learning?.provider === 'mymemory' && <details className="fw-result-details"><summary>参考翻译服务</summary><p className="fw-context-note">MyMemory · 无语境分析 <button type="button" onClick={() => { setSecondaryView('provider'); setSettingsOpen(false); }}>配置语境模型 ↗</button></p></details>}
           {state.context.learning?.timeline?.filter((line) => line.start >= observedSentenceRange(state.context!).end).slice(0, 1).map((line) => <NeighborLine key={`${contextKey}:after:${line.start}`} line={line} current={state.context!.text} online={settings.onlineTranslation} label="下文" />)}
           {state.context.learning?.status === 'error' && <button type="button" className="fw-retry" onClick={() => void controller.retryLearning('translate')}>重试整句翻译</button>}
           <div className="fw-current-actions">
@@ -315,17 +315,17 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
           {state.context.learning && <div className="fw-learning" key={`${state.context.selected.start}:${state.context.text}`}>
 
 
-            <div className="fw-learning-title">优先看这些表达 <span>专业词 · 地道搭配 · 非概率</span></div>
+            <div className="fw-learning-title">值得记住的表达</div>
             {expressions.map((expression) => <div className="fw-candidate fw-context-expression" key={expression.text}>
               <div className="fw-candidate-title"><strong>{expression.text}</strong><span className="fw-kind">{expression.partOfSpeech}</span><button type="button" onClick={() => add(expression.text, expression.kind, expression.meaning, expression.text, expression.partOfSpeech)} title="已收藏的表达仍可点击记录当前语境">{saved(expression.kind, expression.text) ? '已加入' : '加入'}</button></div>
-              <p>{expression.meaning}</p><span className="fw-candidate-reason">{expression.reason}</span>
+              <p>{expression.meaning}</p><details className="fw-expression-details"><summary>用法说明</summary><span className="fw-candidate-reason">{expression.reason}</span></details>
             </div>)}
             {state.context.learning.contextStatus === 'loading' && <p className="fw-learning-note">语境表达解析中…</p>}
             {state.context.learning.contextError && <p className="fw-learning-note">{state.context.learning.contextError} <button type="button" onClick={() => void controller.retryLearning('context')}>重试表达释义</button></p>}
-            {state.context.learning.contextCached && <p className="fw-context-note">表达释义 · 缓存命中</p>}
-            {state.context.learning.provider === 'cloud' && <p className="fw-context-note">根据当前句与邻近字幕解释，模型结果仍需结合原文核对</p>}
-            {state.context.learning.provider !== 'cloud' && !expressions.length && <>
-            <p className="fw-context-note">{GENERAL_MEANING_NOTE}</p>
+
+
+            {state.context.learning.provider !== 'cloud' && state.context.learning.provider !== 'codex-cli' && !expressions.length && <>
+            <details className="fw-result-details"><summary>参考释义说明</summary><p className="fw-context-note">{GENERAL_MEANING_NOTE}</p></details>
             {candidates.length ? candidates.slice(0, expanded ? 8 : 3).map((candidate, index) => {
               const meaning = candidate.translation || candidate.meaning;
               const curated = getCuratedMeaning(candidate.lemma);
@@ -335,14 +335,14 @@ export function FloatingApp({ controller, settings, onPosition, onOffset, onAppe
                   <button type="button" aria-label={`加入单词本 ${candidate.text}`} onClick={() => add(candidate.text, candidate.kind, meaning || '', candidate.lemma, parts[candidate.partOfSpeech ?? ''] || '未分类')} title="已收藏的表达仍可点击记录当前语境">{saved(candidate.kind, candidate.text, candidate.lemma) ? '已加入' : '加入'}</button></div>
                 {curated && <p className="fw-context-note">本地核验通用义（中文自编） · <a href={curated.sourceUrl} target="_blank" rel="noreferrer">{curated.sourceName} 语义依据</a></p>}
                 <p>{meaning}</p>
-                <span className="fw-candidate-reason">{candidate.reason}</span>
+                <details className="fw-expression-details"><summary>用法说明</summary><span className="fw-candidate-reason">{candidate.reason}</span></details>
               </div>;
             }) : <p className="fw-learning-note">当前服务未提供可用表达释义，可配置语境模型</p>}
             {candidates.length > 3 && <button type="button" className="fw-retry" onClick={() => setExpanded(!expanded)}>{expanded ? '收起更多' : '展开更多表达'}</button>}
             </>}
             {state.context.learning.translation && state.context.learning.error && <p className="fw-learning-note">{state.context.learning.error}</p>}
           </div>}
-          <div className="fw-context-note">{state.context.selected.language === 'und' ? '已捕获页面字幕 · 请确认播放器选择了 English' : '来自视频的英文字幕轨道'}</div>
+          <details className="fw-result-details"><summary>字幕来源</summary><p className="fw-context-note">{state.context.selected.language === 'und' ? '页面字幕，请确认播放器选择了 English' : '视频英文字幕轨道'}</p></details>
           <div className="fw-tools">
             <button type="button" onClick={() => void controller.previous()}><Icon name="back" size={15} />上一条字幕</button>
             <button type="button" onClick={() => void controller.capture(settings.offset)}>回到点击时刻</button>

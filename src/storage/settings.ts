@@ -3,6 +3,8 @@ import type { Appearance, BallPosition, Settings } from '../core/types';
 
 export const STORAGE = {
   enabled: 'flowword.enabled.v1',
+  scope: 'flowword.scope.v1',
+  selection: 'flowword.selection.v1',
   position: 'flowword.position.v1',
   offset: 'flowword.offset.v1',
   appearance: 'flowword.appearance.v1',
@@ -10,7 +12,14 @@ export const STORAGE = {
 } as const;
 
 export const DEFAULT_APPEARANCE: Appearance = { fontSize: 16, panelTheme: 'dark', ballColor: '#355f47', ballStyle: 'glass', ballPlacement: 'free', ballOpacity: 90, panelWidth: 460, panelHeight: 620 };
-export const DEFAULT_SETTINGS: Settings = { enabled: false, position: { x: 1, y: 0.62 }, offset: 0, appearance: DEFAULT_APPEARANCE, onlineTranslation: false };
+export const DEFAULT_SELECTION = { enabled: true, autoTranslate: false, fontSize: 16, theme: 'dark' as const };
+// sanitizeSelection 校验划词独立设置，旧安装保留手动划词，不因升级自动上传
+export function sanitizeSelection(value: unknown): import('../core/types').SelectionSettings {
+  const input = value && typeof value === 'object' ? value as Partial<import('../core/types').SelectionSettings> : {};
+  const appearance = sanitizeAppearance({ fontSize: input.fontSize, panelTheme: input.theme });
+  return { enabled: input.enabled !== false, autoTranslate: input.autoTranslate === true, fontSize: appearance.fontSize, theme: appearance.panelTheme };
+}
+export const DEFAULT_SETTINGS: Settings = { enabled: false, selection: DEFAULT_SELECTION, position: { x: 1, y: 0.62 }, offset: 0, appearance: DEFAULT_APPEARANCE, onlineTranslation: false };
 
 export function sanitizeAppearance(value: unknown): Appearance {
   const input = value && typeof value === 'object' ? value as Partial<Appearance> : {};
@@ -42,6 +51,7 @@ export async function readSettings(): Promise<Settings> {
   const stored = await browser.storage.local.get(Object.values(STORAGE));
   return {
     enabled: stored[STORAGE.enabled] === true,
+    selection: sanitizeSelection(stored[STORAGE.selection]),
     position: sanitizePosition(stored[STORAGE.position]),
     offset: sanitizeOffset(stored[STORAGE.offset]),
     appearance: sanitizeAppearance(stored[STORAGE.appearance]),

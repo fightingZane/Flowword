@@ -7,3 +7,50 @@
 :root[data-embedded=true] label{margin:12px 0}
 :root[data-embedded=true] input,:root[data-embedded=true] select{padding:9px;margin-top:5px}
 :root[data-embedded=true] .buttons{position:static;padding:12px 0 4px}
+
+/* 设置页与视频阅读卡片采用同一组颜色和密度 */
+:root { background: #101d19; color: #edf3ed; --muted: #adbeaf; --line: #34483e; }
+main { background: #192923; border-radius: 16px; }
+input, select { background: #101d19; border-color: #34483e; font-weight: 400; }
+label { font-weight: 500; }
+button { background: #b9dec5; color: #173526; border-color: #b9dec5; border-radius: 9px; }
+button:hover { background: #c5e6cf; }
+.active-service { background: #20332b; border-color: #34483e; color: #c9e0d0; }
+:root[data-embedded=true], :root[data-embedded=true] .buttons { background: #192923; }
+main [hidden] { display: none !important; }
+.provider-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 15px 0; color: var(--muted); font-size: 13px; }
+.provider-presets button { background: transparent; color: inherit; border-color: var(--line); padding: 6px 9px; font-size: 12px; }
+.provider-presets button:hover { background: #20332b; color: #edf3ed; }
+.cli-connection { padding: 0 0 10px; }
+.cli-connection h2 { font-size: 19px; font-weight: 500; }
+.cli-connection ol { margin: 13px 0; padding-left: 22px; color: var(--muted); line-height: 1.9; font-size: 14px; }
+.cli-connection code { font-size: .9em; padding: 2px 5px; border-radius: 4px; background: #101d19; color: #cce3d3; overflow-wrap: anywhere; }
+.cli-connection > p, .cli-test-note { font-size: 13px; line-height: 1.7; }
+.cli-import-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 0; }
+.cli-import-row button { padding: 8px 11px; font-size: 14px; }
+.cli-import-row span { color: var(--muted); font-size: 12px; }
+input[readonly] { color: var(--muted); }
+:root[data-embedded=true] .provider-presets { gap: 6px; }
+:root[data-embedded=true] .cli-connection h2 { margin-top: 16px; }
+
+.settings-entry-tabs{display:flex;gap:6px;max-width:760px;margin:12px auto;flex-wrap:wrap}.settings-entry-tabs button{padding:8px 14px}.settings-entry-tabs button[aria-pressed=true]{background:var(--accent,#b9dfca);color:#102019}.scope-sites{display:grid;gap:6px;margin:18px 0;max-height:350px;overflow:auto;scrollbar-width:thin;scrollbar-color:#436b57 transparent}.scope-sites label{display:flex;align-items:center;gap:10px;padding:10px;background:#102019;border:1px solid #314d40;border-radius:10px;margin:0}.scope-sites input{width:auto}.scope-sites span{min-width:0;display:grid;gap:3px}.scope-sites strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.scope-sites small{color:#a4b7aa;overflow-wrap:anywhere}
+/* 从父面板白名单主题复用同一组变量，iframe只有文档自身一个滚动容器 */
+:root.fw-app { font-size:17px; color:var(--fw-ink); background:var(--fw-paper); --muted:var(--fw-muted); --line:var(--fw-line); color-scheme:light; }
+:root.fw-app[data-theme=dark], :root.fw-app[data-theme=ink] { color-scheme:dark; }
+:root.fw-app main { background:var(--fw-paper); }
+:root.fw-app header { color:var(--fw-green); }
+:root.fw-app input, :root.fw-app select { background:var(--fw-paper); color:var(--fw-ink); border-color:var(--fw-line); }
+:root.fw-app input::placeholder { color:var(--fw-muted); }
+:root.fw-app button { background:var(--fw-green); color:var(--fw-on-green); border:1px solid var(--fw-green); }
+:root.fw-app button:hover { filter:brightness(1.08); }
+:root.fw-app button:focus-visible, :root.fw-app input:focus-visible, :root.fw-app select:focus-visible { outline-color:var(--fw-green); }
+:root.fw-app .settings-entry-tabs button, :root.fw-app .provider-presets button { background:var(--fw-wash); color:var(--fw-ink); border-color:var(--fw-line); }
+:root.fw-app .settings-entry-tabs button[aria-pressed=true] { background:var(--fw-green); color:var(--fw-on-green); border-color:var(--fw-green); }
+:root.fw-app .active-service, :root.fw-app .scope-sites label, :root.fw-app .cli-connection code { background:var(--fw-wash); color:var(--fw-ink); border-color:var(--fw-line); }
+:root.fw-app .scope-sites small { color:var(--fw-muted); }
+:root.fw-app .scope-sites { max-height:none; overflow:visible; }
+:root.fw-app[data-embedded=true] { font-size:16px; }
+:root.fw-app[data-embedded=true] .buttons { background:var(--fw-paper); }
+:root.fw-app[data-embedded=true] .settings-entry-tabs { margin:0; padding:10px 18px; border-bottom:1px solid var(--fw-line); }
+:root.fw-app[data-embedded=true] .settings-entry-tabs button { flex:1; }
+@media (max-width:380px) { :root.fw-app[data-embedded=true] main { padding:12px; } :root.fw-app[data-embedded=true] .settings-entry-tabs { padding:8px 12px; gap:6px; } }

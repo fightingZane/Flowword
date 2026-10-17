@@ -37,3 +37,9 @@ flowword-archive v2统一保存entries/videos/captures/occurrences/undo，旧wor
 后台query接口负责分页和索引语境查询，UI不再每次读取完整档案。完整词本40条、快捷词本20条，复习10张；评分和来源重听无模型请求。YouTube可见封面按ID加载，其他站使用已捕获poster/og:image，失败保留占位。
 翻译调度按tab/frame/document及requestId订阅；最后订阅者取消才终止共享请求。缓存异常不抹去已成功响应。预译只对成功新增准备扣会话额度，不能视为提供方计费或token硬上限。
 settings iframe必须持有后台签发且绑定tab/frame的限时授权，独立扩展设置页仍允许直接打开；连接测试不保存配置。
+
+## 0.7 网页来源与选区（当前实现）
+canonical DB升级v3，新sources身份仍复用内部videos存储，captures按sourceId索引，旧videoId与主键不变。source.kind明确video/web，网页无time/end/videoKey；备份v4使用archive.sources，旧v1–v3视频资料可导入
+SelectionApp与视频UI是独立ShadowRoot，普通已授权页不要求video存在。选区只在本地采样，点击后才用后台共享调度翻译；保留捕获时URL/title防SPA错归档，URL变化取消所有旧选区请求并关闭固定卡片
+Selection使用可见Selection.toString而非Range.toString，不读输入区/编辑器/插件，跨选中间敏感元素也拒绝。UI的ShadowRoot用于样式和事件隔离，不构成对宿主网页脚本的内容保密边界；Key仍只在扩展DB及受限跨来源设置iframe中
+网页回看只打开原文/可选文本片段链接，不向播放器发送seek/play；失败不能假造视频时间

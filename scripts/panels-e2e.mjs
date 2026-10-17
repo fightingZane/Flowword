@@ -51,7 +51,7 @@ try {
   assert.equal(run.context.pages().length, initialPages);
   assert.equal((await run.worker.evaluate(() => globalThis.panelRequests)).length, 0);
   const frameBackground = await frame.locator('html').evaluate((element) => getComputedStyle(element).backgroundColor);
-  assert.equal(frameBackground, 'rgb(28, 48, 36)');
+  assert.equal(frameBackground, 'rgb(25, 41, 35)');
   await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/panels-model-settings.png', fullPage: true });
   log('配置在当前悬浮框内嵌入，DeepSeek 预填且未配置不联网，不增加标签页');
   const fakeKey = 'fixture-old-key-do-not-expose';
